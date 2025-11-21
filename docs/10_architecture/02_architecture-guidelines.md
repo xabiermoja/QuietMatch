@@ -1731,6 +1731,396 @@ public async Task DeleteProfileAsync(MemberId id)
 }
 ```
 
+### Configuration & Secrets Best Practices
+
+#### 🔒 Secrets Management (CRITICAL)
+
+**NEVER commit the following to source control**:
+- ❌ API keys (Google, Stripe, Twilio, etc.)
+- ❌ Database passwords
+- ❌ JWT secret keys
+- ❌ Encryption keys
+- ❌ OAuth client secrets
+- ❌ Connection strings with credentials
+- ❌ Service account credentials
+
+**✅ Correct Approach**:
+
+**Local Development**:
+```csharp
+// Use .env file (add to .gitignore)
+// Load in Program.cs
+builder.Configuration.AddEnvironmentVariables();
+
+// Access in code
+var jwtSecret = builder.Configuration["Jwt:SecretKey"];
+var googleClientId = builder.Configuration["Google:ClientId"];
+```
+
+**Azure Production**:
+```csharp
+// Use Azure Key Vault with Managed Identity
+if (!builder.Environment.IsDevelopment())
+{
+    var keyVaultUrl = builder.Configuration["KeyVault:Url"];
+    builder.Configuration.AddAzureKeyVault(
+        new Uri(keyVaultUrl),
+        new DefaultAzureCredential());
+}
+```
+
+**Provide `.env.example`**:
+```bash
+# .env.example (commit this to git as template)
+GOOGLE_CLIENT_ID=your-client-id-here
+GOOGLE_CLIENT_SECRET=your-client-secret-here
+JWT_SECRET_KEY=generate-a-256-bit-key
+POSTGRES_PASSWORD=your-secure-password
+```
+
+---
+
+#### ⚙️ Configuration Best Practices
+
+**All tunable parameters MUST be externalized to configuration**:
+
+**✅ DO externalize**:
+- Rate limits (requests per minute)
+- Timeout values (HTTP, database, cache)
+- Batch sizes (pagination, bulk operations)
+- Retry policies (max attempts, backoff intervals)
+- Feature flags
+- Cache TTL values
+- Token expiration times
+
+**Example - appsettings.json**:
+```json
+{
+  "RateLimiting": {
+    "LoginEndpoint": {
+      "RequestsPerMinute": 5,
+      "IpWhitelist": []
+    }
+  },
+  "Jwt": {
+    "AccessTokenExpiryMinutes": 15,
+    "RefreshTokenExpiryDays": 7
+  },
+  "Resilience": {
+    "HttpTimeoutSeconds": 30,
+    "MaxRetryAttempts": 3,
+    "RetryDelayMilliseconds": 1000
+  },
+  "Caching": {
+    "DefaultTtlMinutes": 10,
+    "ProfileCacheTtlMinutes": 30
+  }
+}
+```
+
+**Load in code**:
+```csharp
+// Strongly-typed configuration (preferred)
+public class RateLimitingOptions
+{
+    public const string Section = "RateLimiting:LoginEndpoint";
+    public int RequestsPerMinute { get; set; } = 5;
+    public List<string> IpWhitelist { get; set; } = new();
+}
+
+// Register in Program.cs
+builder.Services.Configure<RateLimitingOptions>(
+    builder.Configuration.GetSection(RateLimitingOptions.Section));
+
+// Inject in service
+public class AuthController
+{
+    private readonly IOptions<RateLimitingOptions> _rateLimitOptions;
+
+    public AuthController(IOptions<RateLimitingOptions> rateLimitOptions)
+    {
+        _rateLimitOptions = rateLimitOptions;
+    }
+}
+```
+
+**❌ DON'T hardcode**:
+```csharp
+// BAD: Hardcoded values
+const int MAX_LOGIN_ATTEMPTS = 5; // Should be in appsettings
+Thread.Sleep(1000); // Should be configurable timeout
+var cacheExpiry = TimeSpan.FromMinutes(10); // Should be in appsettings
+```
+
+---
+
+#### 🏗️ .NET-Specific Best Practices
+
+**Async/Await**:
+```csharp
+// ✅ DO: Always pass CancellationToken
+public async Task<User> GetUserAsync(Guid id, CancellationToken ct = default)
+{
+    return await _dbContext.Users.FindAsync(new object[] { id }, ct);
+}
+
+// ❌ DON'T: Blocking async calls
+var user = GetUserAsync(id).Result; // Causes deadlocks
+var user = GetUserAsync(id).GetAwaiter().GetResult(); // Still bad
+```
+
+**Dependency Injection Lifetimes**:
+```csharp
+// Scoped: Per HTTP request (DbContext, repositories)
+services.AddScoped<IUserRepository, UserRepository>();
+services.AddDbContext<AppDbContext>(options => ...); // Scoped by default
+
+// Singleton: Shared across application (caches, configuration)
+services.AddSingleton<IMemoryCache, MemoryCache>();
+
+// Transient: New instance per injection (lightweight services)
+services.AddTransient<IEmailService, EmailService>();
+```
+
+**Entity Framework Core**:
+```csharp
+// ✅ DO: Use AsNoTracking for read-only queries
+var users = await _dbContext.Users
+    .AsNoTracking()
+    .Where(u => u.IsActive)
+    .ToListAsync(ct);
+
+// ✅ DO: Explicit loading for navigation properties when needed
+var user = await _dbContext.Users
+    .Include(u => u.RefreshTokens)
+    .FirstOrDefaultAsync(u => u.Id == id, ct);
+
+// ❌ DON'T: N+1 query problem
+foreach (var user in users)
+{
+    // This triggers a separate query for each user
+    var tokens = await _dbContext.RefreshTokens
+        .Where(t => t.UserId == user.Id)
+        .ToListAsync(ct);
+}
+```
+
+**Logging Best Practices**:
+```csharp
+// ✅ DO: Structured logging with message templates
+_logger.LogInformation(
+    "User {UserId} logged in from {IpAddress} at {LoginTime}",
+    userId, ipAddress, DateTime.UtcNow);
+
+// ❌ DON'T: String interpolation (loses structure)
+_logger.LogInformation($"User {userId} logged in from {ipAddress}");
+
+// ✅ DO: Log levels appropriately
+_logger.LogDebug("Processing match for user {UserId}", userId); // Development
+_logger.LogInformation("Match created {MatchId}", matchId); // Production events
+_logger.LogWarning("Google API slow response {Duration}ms", duration);
+_logger.LogError(ex, "Failed to validate token for user {UserId}", userId);
+```
+
+**Exception Handling**:
+```csharp
+// ✅ DO: Catch specific exceptions
+try
+{
+    await _googleAuthService.ValidateIdTokenAsync(idToken, ct);
+}
+catch (GoogleApiException ex)
+{
+    _logger.LogError(ex, "Google API validation failed");
+    throw new AuthenticationException("Invalid ID token", ex);
+}
+
+// ❌ DON'T: Catch and swallow
+try
+{
+    await DoSomethingAsync();
+}
+catch (Exception)
+{
+    // Silent failure - BAD!
+}
+
+// ❌ DON'T: Catch generic exceptions in application code
+catch (Exception ex) // Too broad, use specific exceptions
+```
+
+**Nullable Reference Types**:
+```csharp
+// ✅ DO: Enable nullable reference types (already enabled in .csproj)
+// <Nullable>enable</Nullable>
+
+// ✅ DO: Use null-forgiving operator only when certain
+var user = await _repository.GetByIdAsync(id, ct);
+if (user is null)
+    throw new NotFoundException($"User {id} not found");
+
+return user!; // Null-forgiving - we checked above
+
+// ✅ DO: Use nullable for optional parameters
+public async Task<User?> FindUserAsync(string? email, CancellationToken ct = default)
+{
+    if (string.IsNullOrEmpty(email))
+        return null;
+
+    return await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+}
+```
+
+---
+
+#### 🛡️ Security Best Practices
+
+**Input Validation**:
+```csharp
+// ✅ DO: Use FluentValidation for input validation
+public class LoginRequestValidator : AbstractValidator<LoginRequest>
+{
+    public LoginRequestValidator()
+    {
+        RuleFor(x => x.IdToken)
+            .NotEmpty().WithMessage("ID token is required")
+            .MaximumLength(2048).WithMessage("ID token too long");
+    }
+}
+
+// ✅ DO: Validate at API boundary
+[HttpPost("login")]
+public async Task<IActionResult> Login([FromBody] LoginRequest request)
+{
+    var validator = new LoginRequestValidator();
+    var result = await validator.ValidateAsync(request);
+
+    if (!result.IsValid)
+        return BadRequest(result.Errors);
+
+    // Process request...
+}
+```
+
+**SQL Injection Prevention**:
+```csharp
+// ✅ DO: Use EF Core (parameterized queries by default)
+var user = await _dbContext.Users
+    .FirstOrDefaultAsync(u => u.Email == email, ct);
+
+// ❌ DON'T: Use raw SQL with string concatenation
+var sql = $"SELECT * FROM Users WHERE Email = '{email}'"; // SQL INJECTION!
+
+// ✅ DO: If raw SQL needed, use parameters
+var user = await _dbContext.Users
+    .FromSqlInterpolated($"SELECT * FROM Users WHERE Email = {email}")
+    .FirstOrDefaultAsync(ct);
+```
+
+**Authentication & Authorization**:
+```csharp
+// ✅ DO: Use [Authorize] attribute on controllers/actions
+[Authorize]
+[ApiController]
+[Route("api/v1/profile")]
+public class ProfileController : ControllerBase
+{
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetProfile(Guid id)
+    {
+        // User is authenticated, access User.Claims
+        var userId = User.FindFirst("sub")?.Value;
+
+        // Check authorization
+        if (userId != id.ToString())
+            return Forbid(); // 403 Forbidden
+
+        // Process request...
+    }
+}
+
+// ✅ DO: Validate JWT on every request
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]!))
+        };
+    });
+```
+
+---
+
+#### 📊 Rate Limiting & Throttling
+
+**Rate Limiting Standards**:
+```csharp
+// ✅ DO: Configure rate limiting per endpoint category
+services.Configure<IpRateLimitOptions>(options =>
+{
+    options.GeneralRules = new List<RateLimitRule>
+    {
+        new RateLimitRule
+        {
+            Endpoint = "POST:/api/v1/auth/login/*",
+            Period = "1m",
+            Limit = 5 // 5 requests per minute per IP
+        },
+        new RateLimitRule
+        {
+            Endpoint = "*",
+            Period = "1m",
+            Limit = 100 // Default: 100 requests per minute
+        }
+    };
+});
+
+// ✅ DO: Apply rate limiting middleware
+app.UseIpRateLimiting();
+```
+
+**Guidelines**:
+- **Authentication endpoints**: 5-10 requests/min per IP (prevent brute force)
+- **Read endpoints (GET)**: 100-200 requests/min per user
+- **Write endpoints (POST/PUT)**: 20-50 requests/min per user
+- **Search/expensive queries**: 10-20 requests/min per user
+- **Always configurable**: Load limits from appsettings, not hardcoded
+
+---
+
+#### ✅ Code Review Checklist Extension
+
+**Before committing, verify**:
+
+**Configuration & Secrets**:
+- [ ] No hardcoded credentials, API keys, or secrets
+- [ ] All secrets loaded from environment variables or Key Vault
+- [ ] `.env.example` updated with new configuration keys
+- [ ] Configurable parameters (timeouts, limits) in appsettings.json
+
+**.NET Best Practices**:
+- [ ] All async methods use `CancellationToken`
+- [ ] Proper DI lifetimes (Scoped, Singleton, Transient)
+- [ ] EF Core queries use `AsNoTracking()` for read-only
+- [ ] No N+1 query problems (use `.Include()` for eager loading)
+- [ ] Structured logging with message templates (not string interpolation)
+- [ ] Specific exception handling (not generic `catch (Exception)`)
+
+**Security**:
+- [ ] Input validation with FluentValidation
+- [ ] No SQL injection vulnerabilities (use EF Core or parameterized queries)
+- [ ] JWT validation on all protected endpoints
+- [ ] Rate limiting configured for authentication endpoints
+- [ ] Sensitive data encrypted/hashed (passwords, tokens, PII)
+
 ---
 
 **This concludes the Architecture Guidelines. All implementation decisions MUST follow these rules.**
@@ -1742,6 +2132,6 @@ public async Task DeleteProfileAsync(MemberId id)
 
 ---
 
-**Last Updated**: 2025-11-20
+**Last Updated**: 2025-11-21
 **Document Owner**: Architecture Team
 **Status**: Living Document (updated as patterns evolve)
