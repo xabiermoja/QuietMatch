@@ -285,30 +285,67 @@ See: `docs/10_architecture/07_deployment-and-devops.md`
 ### Quick Overview
 
 QuietMatch uses a **hybrid feature-driven approach**:
-- **Feature Files** (`docs/40_features/f####_feature_name.md`): Comprehensive specifications (source of truth)
+- **Feature Files** (`docs/40_features/f####_feature_name/f####_feature_name.md`): Comprehensive specifications (🔒 IMMUTABLE INPUT)
+- **Implementation Plans** (`docs/40_features/f####_feature_name/plan.md`): Detailed step-by-step tasks (📝 LIVING DOCUMENT)
 - **GitHub Issues**: Lightweight tracking, links to feature file
 
 **Full Workflow Documentation**: [`docs/60_operations/feature-workflow.md`](../docs/60_operations/feature-workflow.md)
 
 ### Implementing a New Feature
 
-1. **Create Feature File**: `docs/40_features/f####_feature_name.md` (use f0001 as template)
+1. **Create Feature Folder and File**: `docs/40_features/f####_feature_name/`
+   - Create folder for feature
+   - Create feature file: `f####_feature_name.md` (use f0001 as template)
    - Fill in ALL sections (acceptance criteria, API specs, diagrams, testing strategy)
+   - **🔒 Feature file is IMMUTABLE INPUT** - specifications defined before implementation
    - Commit to repository
-2. **Create GitHub Issue**: Use issue template, reference feature file
+
+2. **Create Detailed Implementation Plan**: `plan.md` in same folder
+   - **REQUIRED BEFORE CODING**
+   - Expand high-level checklist into detailed step-by-step tasks
+   - Add documentation references for each task
+   - Organize into phases (setup, domain, infrastructure, application, API, messaging, testing)
+   - **📝 Plan is LIVING DOCUMENT** - updated during implementation for progress tracking
+   - Commit to repository
+
+3. **Create GitHub Issue**: Use issue template, reference feature file
    - Include top 5 acceptance criteria only (full list in feature file)
    - Add labels: priority, service, size
    - Link to feature file
-3. **Link Bidirectionally**: Update feature file header with GitHub issue number
-4. **Implement on Feature Branch**: `feature/f####-feature-name`
-   - Write domain models first
-   - Add application services
-   - Add infrastructure (DB, messaging)
-   - Add API endpoints
-   - Write tests
+
+4. **Link Bidirectionally**: Update feature file header with GitHub issue number
+
+5. **Implement on Feature Branch**: `feature/f####-feature-name`
+   - Follow plan.md sequentially
+   - Check off tasks in plan.md as completed
+   - Reference documentation linked in plan.md
+   - Update plan.md with notes and discoveries (within scope)
+   - Commit plan.md updates regularly
    - Reference issue in commits: `feat(service): description (#issue-number)`
-5. **Create Pull Request**: Use `Closes #issue-number` to auto-close
-6. **Update Documentation**: Mark feature as complete, update PROGRESS.md if milestone complete
+   - **🚨 CRITICAL: DO NOT modify feature file during implementation**
+   - **🛑 If requirements change: STOP and ask human for approval**
+
+6. **Create Pull Request**: Use `Closes #issue-number` to auto-close
+
+7. **Update Documentation**: Mark feature file and plan.md as complete, update PROGRESS.md if milestone complete
+
+---
+
+### 🚨 Change Control Rules
+
+**WITHOUT Human Approval** (plan.md only):
+- ✅ Check off completed tasks
+- ✅ Add implementation notes
+- ✅ Add sub-tasks (within scope)
+- ✅ Document technical decisions
+
+**REQUIRES Human Approval**:
+- ❌ Modifying feature file (acceptance criteria, API specs, schema)
+- ❌ Adding new requirements or features
+- ❌ Removing scope from plan
+- ❌ Changing architecture approach significantly
+
+**When approval needed**: Stop, document in plan.md under "Blockers", ask human via issue comment
 
 **See**: [`docs/60_operations/feature-workflow.md`](../docs/60_operations/feature-workflow.md) for complete step-by-step guide
 

@@ -22,20 +22,33 @@
 QuietMatch uses a **hybrid feature-driven development approach**:
 
 ### Feature Files (Source of Truth)
-**Location**: `docs/40_features/f####_feature_name.md`
+**Location**: `docs/40_features/f####_feature_name/`
 
-**Purpose**: Comprehensive specification with all details
+**Structure**:
+- `f####_feature_name.md` - Comprehensive specification
+- `plan.md` - Detailed implementation plan with doc references
 
-**Contains**:
+**Feature File Contains**:
 - ✅ Full acceptance criteria (all of them)
 - ✅ Detailed API specifications
 - ✅ Database schema changes
 - ✅ Sequence diagrams
 - ✅ Testing strategy (unit, integration, manual)
-- ✅ Complete implementation checklist
+- ✅ High-level implementation checklist
 - ✅ Security requirements
 - ✅ Configuration details
 - ✅ Dependencies
+
+**🔒 IMMUTABLE INPUT**: Feature file is the **specification** - do NOT alter during implementation without human approval
+
+**Implementation Plan Contains**:
+- ✅ Step-by-step tasks (expanded from checklist)
+- ✅ Documentation references for each task
+- ✅ Order dependencies
+- ✅ Progress tracking (checkboxes)
+- ✅ Notes and decisions made during implementation
+
+**📝 LIVING DOCUMENT**: Plan.md is updated during implementation for progress tracking
 
 **Who reads**: Developers implementing the feature (you!)
 
@@ -71,6 +84,46 @@ QuietMatch uses a **hybrid feature-driven development approach**:
 | **Source of Truth** | ✅ YES | ❌ No (points to file) |
 
 **Best of both worlds**: Rich documentation + GitHub integration
+
+---
+
+## 🚨 Change Control and Approval
+
+### What Can Be Updated WITHOUT Human Approval
+
+**In plan.md (implementation plan)**:
+- ✅ Check off completed tasks
+- ✅ Add notes about implementation details
+- ✅ Add newly discovered sub-tasks (within scope)
+- ✅ Update timestamps
+- ✅ Document technical decisions that don't affect requirements
+
+**Example**: "Added validation for email format" (implementation detail)
+
+---
+
+### What REQUIRES Human Approval
+
+**Changes to feature file** (f####_feature_name.md):
+- ❌ Modifying acceptance criteria
+- ❌ Changing API specifications
+- ❌ Altering database schema
+- ❌ Adding/removing requirements
+
+**Changes to plan.md that alter scope**:
+- ❌ Adding entirely new phases or major features
+- ❌ Removing acceptance criteria from scope
+- ❌ Significantly changing architecture approach
+
+**When You Need Approval**:
+1. **Stop implementation**
+2. **Document the issue** in plan.md under "Blockers/Questions"
+3. **Ask human for approval** via issue comment or discussion
+4. **Wait for approval** before proceeding
+5. **Update feature file** only after approval received
+6. **Update plan.md** to reflect approved changes
+
+**Example**: "Discovered Google OAuth requires additional 'profile' scope not in original spec - needs approval to add AC15"
 
 ---
 
@@ -125,9 +178,128 @@ QuietMatch uses a **hybrid feature-driven development approach**:
 
 ---
 
-### Step 2: Create GitHub Issue
+### Step 2: Create Detailed Implementation Plan
 
-**When**: After feature file is committed
+**When**: After feature file is committed, before starting implementation
+
+**Purpose**: Break down the high-level implementation checklist into detailed, step-by-step tasks with documentation references
+
+**Process**:
+1. Create file: `docs/40_features/f####_feature_name/plan.md`
+   - Create folder for feature: `docs/40_features/f####_feature_name/`
+   - Move feature file into folder: `f####_feature_name.md`
+   - Create plan file: `plan.md`
+
+2. Expand the implementation checklist into detailed tasks:
+   ```markdown
+   # Implementation Plan - F0002: Your Feature Name
+
+   **Status**: 🟡 In Progress
+   **Started**: 2025-11-21
+   **Last Updated**: 2025-11-21
+
+   ## Setup
+   - [ ] Create feature branch: `feature/f0002-your-feature-name`
+   - [ ] Review relevant documentation (list specific docs)
+
+   ## Phase 1: Domain Layer
+   - [ ] Create domain entities
+     - **Reference**: `docs/10_architecture/03_service-templates.md` (Section X.X)
+     - **Why**: Domain-first approach per architecture guidelines
+     - [ ] Create Entity1 with value objects
+     - [ ] Create Entity2 with business rules
+     - [ ] Add domain events if needed
+
+   ## Phase 2: Infrastructure Layer
+   - [ ] Set up database context
+     - **Reference**: `docs/10_architecture/02_architecture-guidelines.md` (EF Core section)
+     - [ ] Create DbContext
+     - [ ] Configure entity mappings
+     - [ ] Create migration: `Add_Entity1_Entity2_Tables`
+
+   ## Phase 3: Application Layer
+   - [ ] Implement application services
+     - **Reference**: Feature file acceptance criteria
+     - [ ] Create Service1 with business logic
+     - [ ] Add FluentValidation
+
+   ## Phase 4: API Layer
+   - [ ] Add endpoints
+     - **Reference**: Feature file API specification
+     - [ ] Create Controller with endpoints
+     - [ ] Add JWT authentication middleware
+     - [ ] Add rate limiting
+
+   ## Phase 5: Messaging
+   - [ ] Configure event publishing
+     - **Reference**: `docs/10_architecture/06_messaging-and-integration.md`
+     - [ ] Create event definitions
+     - [ ] Configure MassTransit
+     - [ ] Implement outbox pattern
+
+   ## Phase 6: Testing
+   - [ ] Write unit tests
+     - **Reference**: Feature file testing strategy
+     - [ ] Domain logic tests
+     - [ ] Application service tests
+   - [ ] Write integration tests
+     - [ ] API endpoint tests
+     - [ ] Database tests
+
+   ## Phase 7: Docker Integration
+   - [ ] Create Dockerfile
+   - [ ] Update docker-compose.yml
+   - [ ] Test locally
+
+   ## Completion
+   - [ ] All tests passing
+   - [ ] Manual testing checklist complete
+   - [ ] Feature file updated
+   - [ ] Ready for PR
+   ```
+
+3. Add specific documentation references for each task:
+   - Link to architecture guidelines
+   - Link to service templates
+   - Link to security docs
+   - Link to messaging docs
+   - Reference specific sections/line numbers
+
+4. Include dependencies and order:
+   - Note which tasks must be done before others
+   - Mark blocking dependencies
+
+5. Commit the plan:
+   ```bash
+   git add docs/40_features/f0002_your_feature/
+   git commit -m "docs: add implementation plan for F0002"
+   git push
+   ```
+
+**During Implementation**:
+- ✅ Check off tasks as you complete them
+- 📝 Add implementation notes and technical details to plan.md
+- 🔗 Document decisions made (within scope)
+- ⏰ Update "Last Updated" timestamp regularly
+- 🛑 **STOP and ask for human approval** if you need to change feature file or scope
+
+**Important Reminders**:
+- 🔒 **Feature file is IMMUTABLE** - it's the input specification
+- 📝 **Plan.md is for tracking** - update progress freely, but scope changes need approval
+- 🚨 **Scope changes = human approval required** - don't alter requirements on your own
+
+**Benefits**:
+- **Clear roadmap**: Know exactly what to build next
+- **Documentation compliance**: Each task references guidelines
+- **Progress tracking**: See at a glance what's done vs. remaining
+- **Onboarding**: New developers can follow the plan to understand implementation
+- **Learning**: Explicit links to docs teach patterns as you build
+
+---
+
+### Step 3: Create GitHub Issue
+
+**When**: After feature file and plan are committed
 
 **Process**:
 1. Go to GitHub Issues tab
@@ -162,7 +334,7 @@ QuietMatch uses a **hybrid feature-driven development approach**:
 
 ---
 
-### Step 3: Link Feature File and Issue
+### Step 4: Link Feature File and Issue
 
 **Update feature file header**:
 ```markdown
@@ -173,14 +345,20 @@ QuietMatch uses a **hybrid feature-driven development approach**:
 
 **Commit update**:
 ```bash
-git add docs/40_features/f0002_your_feature.md
+git add docs/40_features/f0002_your_feature/
 git commit -m "docs: link F0002 to GitHub issue #5"
 git push
 ```
 
 ---
 
-### Step 4: Implementation
+### Step 5: Implementation
+
+**Prerequisites**:
+- ✅ Feature file complete
+- ✅ Implementation plan (plan.md) created
+- ✅ GitHub issue created and linked
+- ✅ Relevant documentation reviewed
 
 **Branch naming**:
 ```bash
@@ -195,17 +373,30 @@ git commit -m "test(profile): add tests for F0002 (#5)"
 ```
 
 **During implementation**:
-- Check off items in feature file as you complete them
-- Update issue checkboxes periodically (optional, not required)
-- Commit feature file updates:
+- ✅ Check off items in **plan.md** as you complete them
+- 📝 Add notes to plan.md about implementation decisions and discoveries (within scope)
+- ⏰ Update "Last Updated" timestamp in plan.md regularly
+- 🔄 Update issue checkboxes periodically (optional, not required)
+- 💾 Commit plan.md updates frequently:
   ```bash
-  git add docs/40_features/f0002_your_feature.md
-  git commit -m "docs: update F0002 progress"
+  git add docs/40_features/f0002_your_feature/plan.md
+  git commit -m "docs: update F0002 implementation progress"
   ```
+
+**Following the Plan**:
+- Work through plan.md phases sequentially
+- Reference documentation linked in each task
+- Don't skip ahead - dependencies matter
+- Add sub-tasks to plan.md as discovered (within scope)
+
+**🚨 Critical Rule**:
+- 🔒 **DO NOT modify feature file** (f####_feature_name.md) during implementation
+- 🛑 **If you discover requirements need to change**, STOP and ask human for approval
+- ✅ **Only update plan.md** for progress tracking and implementation notes
 
 ---
 
-### Step 5: Create Pull Request
+### Step 6: Create Pull Request
 
 **When**: Feature implementation complete, all tests passing
 
@@ -251,7 +442,7 @@ One-paragraph description of what this PR does.
 
 ---
 
-### Step 6: Review and Merge
+### Step 7: Review and Merge
 
 1. **Self-review** or request review (if team)
 2. **CI checks pass** (tests, linting)
@@ -260,14 +451,21 @@ One-paragraph description of what this PR does.
 
 ---
 
-### Step 7: Update Documentation
+### Step 8: Update Documentation
 
-**Update feature file**:
+**Update feature folder**:
 ```markdown
+# In f####_feature_name.md (feature file):
 **Status**: ✅ Complete (updated from "In Progress")
 **GitHub Issue**: [#5](link) (Closed)
 **Pull Request**: [#42](link) (Merged)
 **Completed**: 2025-11-25
+
+# In plan.md (implementation plan):
+**Status**: ✅ Complete
+**Completed**: 2025-11-25
+**Total Implementation Time**: X hours
+**Notes**: Any lessons learned, deviations from plan, or insights
 ```
 
 **Update PROGRESS.md** (when milestone complete):
@@ -279,7 +477,7 @@ One-paragraph description of what this PR does.
 
 **Commit**:
 ```bash
-git add docs/40_features/f0002_your_feature.md PROGRESS.md
+git add docs/40_features/f0002_your_feature/ PROGRESS.md
 git commit -m "docs: mark F0002 as complete"
 git push
 ```
