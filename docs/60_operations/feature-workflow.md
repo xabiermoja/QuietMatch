@@ -133,45 +133,63 @@ QuietMatch uses a **hybrid feature-driven development approach**:
 
 **When**: Before writing any code
 
+**Purpose**: Define business requirements and technical specifications - the **WHAT**, not the **HOW**
+
 **Process**:
-1. Create file: `docs/40_features/f####_feature_name.md`
+1. Create folder: `docs/40_features/f####_feature_name/`
    - Use next sequential number (f0001, f0002, etc.)
-   - Use lowercase with underscores: `f0001_sign_in_with_google.md`
+   - Use lowercase with underscores: `f0001_sign_in_with_google/`
 
-2. Copy template from `f0001_sign_in_with_google.md`
+2. Create feature file: `f####_feature_name.md`
+   - Copy template from `f0001_sign_in_with_google.md`
 
-3. Fill in all sections:
-   ```markdown
-   # Feature F0001: Your Feature Name
+3. Fill in all sections with **BUSINESS SPECIFICATIONS ONLY**:
 
-   **Status**: 🔴 Not Started
-   **Priority**: P0/P1/P2/P3
-   **GitHub Issue**: (leave blank for now)
-   **Assignee**: TBD
-   **Sprint**: Phase X
-   **Estimated Effort**: X hours
+**✅ What to Include** (Business Specifications):
+- **Business Goals**: User value, why this feature matters
+- **Acceptance Criteria**: ALL functional, non-functional, security requirements
+- **User Stories**: Gherkin scenarios (Given/When/Then)
+- **API Specification**: Endpoints, request/response formats, HTTP status codes, error responses
+- **Database Schema**: DDL statements (CREATE TABLE), relationships, indexes
+- **Sequence Diagrams**: Mermaid diagrams showing flows
+- **Events Published/Consumed**: Event names, payload structure, subscribers
+- **Configuration**: Environment variables needed
+- **Testing Requirements**: WHAT needs to be tested (not test code)
+  - Example: "Must test that invalid tokens return 400"
+  - Example: "Must verify UserRegistered event is published for new users"
+- **Security Requirements**: Authentication, authorization, encryption, GDPR
+- **Dependencies**: What must be done before/after this feature
 
-   ## Overview
-   ...detailed description...
+**❌ What NOT to Include** (Implementation Details):
+- ❌ Code implementations or snippets (except API request/response examples)
+- ❌ Test code (xUnit tests, Moq setup, assertions)
+- ❌ Class names or method signatures
+- ❌ Package/library choices (e.g., "use FluentValidation")
+- ❌ Folder structure or file organization
+- ❌ "How to implement" instructions
 
-   ## Acceptance Criteria
-   - [ ] AC1: ...
-   - [ ] AC2: ...
-   (list ALL criteria)
+**Example - Good vs Bad**:
+```markdown
+✅ GOOD (Business Spec):
+## Testing Requirements
+- Verify invalid Google ID token returns 400 Bad Request
+- Verify new user creation triggers UserRegistered event
+- Verify rate limiting blocks after 5 attempts per IP per minute
+- Verify JWT token contains correct claims (sub, email, jti)
 
-   ## API Specification
-   ...full API docs...
-
-   ## Database Changes
-   ...schema...
-
-   ## Testing Strategy
-   ...complete testing plan...
-   ```
+❌ BAD (Implementation Details):
+## Testing Strategy
+[Fact]
+public async Task LoginWithGoogle_WhenTokenInvalid_ShouldReturn400()
+{
+    var mockService = new Mock<IGoogleAuthService>();
+    ...
+}
+```
 
 4. Commit to repo:
    ```bash
-   git add docs/40_features/f0002_your_feature.md
+   git add docs/40_features/f0002_your_feature/
    git commit -m "docs: add feature spec for F0002 Your Feature"
    git push
    ```
@@ -182,94 +200,283 @@ QuietMatch uses a **hybrid feature-driven development approach**:
 
 **When**: After feature file is committed, before starting implementation
 
-**Purpose**: Break down the high-level implementation checklist into detailed, step-by-step tasks with documentation references
+**Purpose**: Create a detailed, smart implementation roadmap that applies all architecture guidelines to this specific feature - the **HOW**
 
 **Process**:
 1. Create file: `docs/40_features/f####_feature_name/plan.md`
-   - Create folder for feature: `docs/40_features/f####_feature_name/`
-   - Move feature file into folder: `f####_feature_name.md`
-   - Create plan file: `plan.md`
 
-2. Expand the implementation checklist into detailed tasks:
-   ```markdown
-   # Implementation Plan - F0002: Your Feature Name
+2. Create a **VERY DETAILED, VERY SMART** implementation roadmap:
 
-   **Status**: 🟡 In Progress
-   **Started**: 2025-11-21
-   **Last Updated**: 2025-11-21
+**✅ What to Include** (Detailed Smart Roadmap):
 
-   ## Setup
-   - [ ] Create feature branch: `feature/f0002-your-feature-name`
-   - [ ] Review relevant documentation (list specific docs)
+**Structure**:
+- **Phases**: Organize by architecture layers (Setup, Domain, Infrastructure, Application, API, Messaging, Testing, Docker)
+- **Tasks**: Very specific, actionable items with checkboxes
+- **Documentation References**: Link to specific docs/sections for each task
+- **Architecture Application**: Show how guidelines apply to THIS feature
+- **Technical Decisions**: Explain WHY certain approaches are used
+- **Dependencies**: Mark order and blocking tasks
+- **Entity/Property Lists**: Enumerate what needs to be created (but not the code)
+- **Configuration Details**: Specific environment variables, connection strings
+- **Testing Breakdown**: Specific test scenarios to implement
+- **Progress Tracking**: Checkboxes, notes sections, blockers section
 
-   ## Phase 1: Domain Layer
-   - [ ] Create domain entities
-     - **Reference**: `docs/10_architecture/03_service-templates.md` (Section X.X)
-     - **Why**: Domain-first approach per architecture guidelines
-     - [ ] Create Entity1 with value objects
-     - [ ] Create Entity2 with business rules
-     - [ ] Add domain events if needed
+**Example Structure**:
+```markdown
+# Implementation Plan - F0002: Your Feature Name
 
-   ## Phase 2: Infrastructure Layer
-   - [ ] Set up database context
-     - **Reference**: `docs/10_architecture/02_architecture-guidelines.md` (EF Core section)
-     - [ ] Create DbContext
-     - [ ] Configure entity mappings
-     - [ ] Create migration: `Add_Entity1_Entity2_Tables`
+**Status**: 🟡 In Progress
+**Feature File**: [Link to feature spec]
+**Architecture Pattern**: Layered (or Onion/Hexagonal/CQRS)
+**Started**: TBD
+**Last Updated**: 2025-11-21
+**Estimated Total Time**: X hours
 
-   ## Phase 3: Application Layer
-   - [ ] Implement application services
-     - **Reference**: Feature file acceptance criteria
-     - [ ] Create Service1 with business logic
-     - [ ] Add FluentValidation
+## Prerequisites
+### Documentation to Review Before Starting
+- [ ] Read Architecture Guidelines - Layered Architecture section
+- [ ] Read Service Templates - Folder structure for Layered
+- [ ] Read Security & Auth - JWT implementation
+- [ ] Read Feature Specification completely
 
-   ## Phase 4: API Layer
-   - [ ] Add endpoints
-     - **Reference**: Feature file API specification
-     - [ ] Create Controller with endpoints
-     - [ ] Add JWT authentication middleware
-     - [ ] Add rate limiting
+### Environment Setup
+- [ ] Docker Desktop running
+- [ ] Start infrastructure: `docker-compose up -d`
+- [ ] Verify database connection
 
-   ## Phase 5: Messaging
-   - [ ] Configure event publishing
-     - **Reference**: `docs/10_architecture/06_messaging-and-integration.md`
-     - [ ] Create event definitions
-     - [ ] Configure MassTransit
-     - [ ] Implement outbox pattern
+## Phase 0: Setup (X minutes)
+- [ ] Create feature branch: `feature/f0002-your-feature-name`
+- [ ] Create project structure following Layered template
+  - **Reference**: Service Templates - Layered Architecture
+  - **Structure**: Domain, Application, Infrastructure, API, Tests
+- [ ] Add project references (respecting layer dependencies)
+- [ ] Install required NuGet packages
+  - **Domain**: (usually none)
+  - **Infrastructure**: EF Core, messaging libraries
+  - **Application**: FluentValidation, MediatR
+  - **API**: Authentication, logging, rate limiting
+- [ ] Create PATTERNS.md documenting architecture choice
 
-   ## Phase 6: Testing
-   - [ ] Write unit tests
-     - **Reference**: Feature file testing strategy
-     - [ ] Domain logic tests
-     - [ ] Application service tests
-   - [ ] Write integration tests
-     - [ ] API endpoint tests
-     - [ ] Database tests
+## Phase 1: Domain Layer (X time)
+- [ ] Create User entity
+  - **Reference**: Architecture Guidelines - Domain Entities
+  - **Reference**: Feature Spec - Database Schema (lines X-Y)
+  - **Properties**: Id (Guid), Email (string), Provider (enum), ExternalUserId (string), CreatedAt, LastLoginAt
+  - **Business Rules**: Factory method CreateFromGoogle(), RecordLogin() method
+  - **Why**: Rich domain model, encapsulates business logic
 
-   ## Phase 7: Docker Integration
-   - [ ] Create Dockerfile
-   - [ ] Update docker-compose.yml
-   - [ ] Test locally
+- [ ] Create RefreshToken entity
+  - **Reference**: Security & Auth - Token Management
+  - **Properties**: Id, UserId, TokenHash (SHA-256), ExpiresAt, CreatedAt, RevokedAt, IsRevoked
+  - **Business Rules**: Create() factory, Revoke() method, IsValid() validation
+  - **Relationships**: Many-to-one with User
 
-   ## Completion
-   - [ ] All tests passing
-   - [ ] Manual testing checklist complete
-   - [ ] Feature file updated
-   - [ ] Ready for PR
-   ```
+- [ ] Create repository interfaces
+  - **Reference**: Architecture Guidelines - Repository Pattern
+  - **Why**: Interfaces in Domain, implementations in Infrastructure (Layered pattern)
+  - IUserRepository: GetByIdAsync, GetByExternalUserIdAsync, GetByEmailAsync, AddAsync, UpdateAsync
+  - IRefreshTokenRepository: GetByTokenHashAsync, GetActiveByUserIdAsync, AddAsync, UpdateAsync
 
-3. Add specific documentation references for each task:
-   - Link to architecture guidelines
-   - Link to service templates
-   - Link to security docs
-   - Link to messaging docs
-   - Reference specific sections/line numbers
+## Phase 2: Infrastructure - Persistence (X time)
+- [ ] Create IdentityDbContext
+  - **Reference**: Service Templates - Infrastructure DbContext
+  - DbSet<User>, DbSet<RefreshToken>
+  - Override OnModelCreating to apply configurations
 
-4. Include dependencies and order:
-   - Note which tasks must be done before others
-   - Mark blocking dependencies
+- [ ] Create entity configurations
+  - **Reference**: EF Core Fluent API best practices
+  - UserConfiguration: Table mapping, indexes, constraints
+  - RefreshTokenConfiguration: Table mapping, foreign keys, indexes
+  - **Apply from Feature Spec**: All DDL requirements from Database Schema section
 
-5. Commit the plan:
+- [ ] Implement repositories
+  - **Reference**: Repository Pattern guidelines
+  - UserRepository: Implement all IUserRepository methods
+  - RefreshTokenRepository: Implement all IRefreshTokenRepository methods
+  - **Note**: Use async/await, CancellationToken support
+
+- [ ] Create and apply EF Core migration
+  - Migration name: `Add_Users_RefreshTokens_Tables`
+  - Verify migration SQL matches feature spec DDL
+  - Apply to local database
+
+## Phase 3: Infrastructure - External Services (X time)
+- [ ] Create Google OAuth validation service
+  - **Reference**: Security & Auth - Google OAuth section
+  - **Reference**: Feature Spec - AC6 (validate ID token with Google)
+  - Interface: IGoogleAuthService
+  - Implementation: GoogleAuthService using Google.Apis.Auth library
+  - Methods: ValidateIdTokenAsync(idToken) → GoogleUserInfo
+  - **Security**: Verify aud, iss, exp claims
+
+- [ ] Create JWT token generator
+  - **Reference**: Security & Auth - JWT Implementation
+  - **Reference**: Feature Spec - AC9, AC10 (generate tokens)
+  - Interface: IJwtTokenGenerator
+  - Methods: GenerateAccessToken(userId, email), GenerateRefreshToken(), HashToken(token)
+  - **Configuration**: Read from appsettings (SecretKey, Issuer, Audience, Expiry)
+  - **Security**: Use HMAC-SHA256, include jti claim
+
+## Phase 4: Application Layer (X time)
+- [ ] Create DTOs
+  - LoginWithGoogleRequest: IdToken property
+  - LoginResponse: AccessToken, RefreshToken, ExpiresIn, TokenType, UserId, IsNewUser, Email
+  - **Reference**: Feature Spec - API Specification request/response
+
+- [ ] Create AuthService
+  - **Reference**: Feature Spec - Acceptance Criteria (all ACs)
+  - Method: LoginWithGoogleAsync(idToken) → LoginResponse
+  - **Logic Flow**:
+    1. Validate ID token with Google (AC6)
+    2. Check if user exists by externalUserId
+    3. If new: Create user (AC7), publish UserRegistered event
+    4. If existing: Update lastLoginAt (AC8)
+    5. Generate JWT access token (AC9)
+    6. Create refresh token, hash and store (AC10)
+    7. Return response (AC11)
+
+- [ ] Create FluentValidation validators
+  - **Reference**: Architecture Guidelines - Validation
+  - LoginWithGoogleRequestValidator: Validate idToken not empty
+
+## Phase 5: API Layer (X time)
+- [ ] Create AuthController
+  - **Reference**: Feature Spec - API Specification
+  - Endpoint: POST /api/v1/auth/login/google
+  - **Request**: LoginWithGoogleRequest
+  - **Responses**: 200 (success), 400 (invalid token), 429 (rate limit), 500 (server error)
+  - **Error Format**: RFC 7807 Problem Details
+
+- [ ] Configure Dependency Injection (Program.cs)
+  - Register DbContext with connection string
+  - Register repositories (scoped)
+  - Register services (scoped)
+  - Register validators
+  - **Reference**: Architecture Guidelines - DI Patterns
+
+- [ ] Configure JWT authentication
+  - **Reference**: Security & Auth - JWT Middleware
+  - Add JWT Bearer authentication
+  - Configure token validation parameters
+
+- [ ] Configure rate limiting
+  - **Reference**: Feature Spec - NF3 (5 requests per IP per minute)
+  - Use AspNetCoreRateLimit library
+  - Configure IP-based rate limiting
+
+- [ ] Configure Serilog logging
+  - Console sink (development)
+  - Seq sink (structured logging)
+  - Include correlation IDs
+
+- [ ] Create appsettings.json configuration
+  - ConnectionStrings:IdentityDb
+  - Google:ClientId, Google:ClientSecret
+  - Jwt:SecretKey, Jwt:Issuer, Jwt:Audience, Jwt:AccessTokenExpiryMinutes
+  - IpRateLimiting configuration
+  - Serilog configuration
+
+## Phase 6: Messaging Integration (X time)
+- [ ] Create UserRegistered event
+  - **Reference**: Feature Spec - Events Published
+  - **Reference**: Messaging Guidelines - Event Design
+  - Properties: UserId, Email, Provider, RegisteredAt, CorrelationId
+  - **Naming**: Past tense (event happened)
+
+- [ ] Configure MassTransit
+  - **Reference**: Messaging Guidelines - MassTransit Setup
+  - Register MassTransit in DI
+  - Configure RabbitMQ for local (development)
+  - Configure Azure Service Bus for production
+  - **Environment-based**: Use IsDevelopment() check
+
+- [ ] Update AuthService to publish event
+  - **Reference**: Feature Spec - AC7 (publish on new user)
+  - Inject IPublishEndpoint
+  - Publish UserRegistered after creating new user
+  - Include correlation ID for tracing
+
+## Phase 7: Testing (X time)
+- [ ] Unit Tests - Domain Layer
+  - **Reference**: Feature Spec - Testing Requirements
+  - Test User.CreateFromGoogle() sets properties correctly
+  - Test User.RecordLogin() updates timestamp
+  - Test RefreshToken.Create() sets expiry correctly
+  - Test RefreshToken.Revoke() marks as revoked
+  - Test RefreshToken.IsValid() checks expiry and revocation
+
+- [ ] Unit Tests - Application Layer
+  - Test AuthService.LoginWithGoogle with valid token creates new user
+  - Test AuthService.LoginWithGoogle with valid token updates existing user
+  - Test AuthService.LoginWithGoogle with invalid token returns null
+  - Test AuthService.LoginWithGoogle publishes UserRegistered for new users
+  - **Use Moq** for mocking dependencies
+
+- [ ] Integration Tests - API Layer
+  - **Reference**: Architecture Guidelines - Integration Testing
+  - Test POST /api/v1/auth/login/google with new user returns 200 + isNewUser=true
+  - Test POST /api/v1/auth/login/google with existing user returns 200 + isNewUser=false
+  - Test POST /api/v1/auth/login/google with invalid token returns 400
+  - Test rate limiting blocks after 5 attempts (returns 429)
+  - **Use Testcontainers** for real PostgreSQL and RabbitMQ
+  - **Use WebApplicationFactory** for in-memory API testing
+
+- [ ] Manual Testing Checklist
+  - **Reference**: Feature Spec - Manual Testing section
+  - Test with real Google OAuth flow
+  - Verify tokens in database
+  - Verify event in RabbitMQ UI
+  - Verify logs in Seq
+  - Test error scenarios
+
+## Phase 8: Docker Integration (X time)
+- [ ] Create Dockerfile for IdentityService
+  - Multi-stage build (build → publish → runtime)
+  - Base: mcr.microsoft.com/dotnet/aspnet:8.0
+  - SDK: mcr.microsoft.com/dotnet/sdk:8.0
+
+- [ ] Update docker-compose.yml
+  - Add identity-service configuration
+  - Configure environment variables
+  - Set up depends_on (postgres, rabbitmq)
+  - Map ports
+
+- [ ] Test Docker build and run locally
+
+## Completion Checklist
+- [ ] All acceptance criteria from feature spec met
+- [ ] All tests passing (unit + integration)
+- [ ] Manual testing complete
+- [ ] Docker container runs successfully
+- [ ] Code follows architecture guidelines (Layered pattern)
+- [ ] Uses ubiquitous language
+- [ ] No hardcoded values (all in config)
+- [ ] Security requirements met (JWT, hashing, validation)
+- [ ] Ready for PR
+
+## Blockers / Questions
+*Document any issues requiring human approval*
+
+## Notes & Decisions
+*Document implementation discoveries and decisions*
+```
+
+**❌ What NOT to Include** (Final Code):
+- ❌ Complete class implementations (no full C# code)
+- ❌ Copy-paste bash command sequences
+- ❌ Complete method bodies with every line of code
+- ❌ Full test method implementations
+
+**✅ What TO Include** (Smart Guidance):
+- ✅ What to create (entity names, properties, method signatures)
+- ✅ Why certain approaches (architecture reasoning)
+- ✅ Which docs to reference for implementation details
+- ✅ Configuration values and structure
+- ✅ Test scenarios to implement (not the test code itself)
+- ✅ Logical flow descriptions
+- ✅ Architecture pattern application
+
+3. Commit the plan:
    ```bash
    git add docs/40_features/f0002_your_feature/
    git commit -m "docs: add implementation plan for F0002"

@@ -342,75 +342,51 @@ JWT_REFRESH_TOKEN_EXPIRY_DAYS=7
 
 ---
 
-## Testing Strategy
+## Testing Requirements
 
-### Unit Tests
+### Unit Testing Requirements
 
-```csharp
-// IdentityService.Tests/Unit/Application/AuthServiceTests.cs
+**Domain Layer**:
+- Must test User.CreateFromGoogle() correctly sets all properties (Id, Email, Provider, ExternalUserId, CreatedAt)
+- Must test User.RecordLogin() updates LastLoginAt timestamp
+- Must test RefreshToken.Create() sets expiry date correctly (7 days from creation)
+- Must test RefreshToken.Revoke() marks token as revoked and sets RevokedAt
+- Must test RefreshToken.IsValid() returns false when expired
+- Must test RefreshToken.IsValid() returns false when revoked
 
-[Fact]
-public async Task LoginWithGoogle_WhenTokenValid_ShouldReturnAccessToken()
-{
-    // Arrange
-    var mockGoogleService = new Mock<IGoogleAuthService>();
-    mockGoogleService.Setup(s => s.ValidateIdTokenAsync(It.IsAny<string>()))
-        .ReturnsAsync(new GoogleUserInfo { Sub = "google-123", Email = "test@example.com" });
+**Application Layer**:
+- Must test AuthService.LoginWithGoogle with valid token creates new user
+- Must test AuthService.LoginWithGoogle with valid token updates existing user's LastLoginAt
+- Must test AuthService.LoginWithGoogle with invalid token returns null or throws appropriate exception
+- Must test AuthService.LoginWithGoogle publishes UserRegistered event for new users only
+- Must test AuthService.LoginWithGoogle generates JWT token with correct claims (sub, email, jti)
+- Must test AuthService.LoginWithGoogle creates and hashes refresh token
 
-    var service = new AuthService(mockGoogleService.Object, ...);
+**Infrastructure Layer**:
+- Must test GoogleAuthService validates legitimate Google ID tokens
+- Must test GoogleAuthService rejects invalid/expired Google ID tokens
+- Must test JwtTokenGenerator creates valid JWT with correct issuer, audience, expiry
+- Must test JwtTokenGenerator.HashToken produces consistent SHA-256 hash
 
-    // Act
-    var result = await service.LoginWithGoogleAsync("valid-id-token");
+### Integration Testing Requirements
 
-    // Assert
-    Assert.NotNull(result.AccessToken);
-    Assert.NotNull(result.RefreshToken);
-}
+**API Endpoints**:
+- Must test POST /api/v1/auth/login/google with new user returns 200 OK with isNewUser=true
+- Must test POST /api/v1/auth/login/google with existing user returns 200 OK with isNewUser=false
+- Must test POST /api/v1/auth/login/google with invalid ID token returns 400 Bad Request
+- Must test POST /api/v1/auth/login/google respects rate limiting (429 after 5 attempts per IP per minute)
+- Must test response includes all required fields (accessToken, refreshToken, userId, email, tokenType, expiresIn)
 
-[Fact]
-public async Task LoginWithGoogle_WhenTokenInvalid_ShouldThrowException()
-{
-    // Arrange
-    var mockGoogleService = new Mock<IGoogleAuthService>();
-    mockGoogleService.Setup(s => s.ValidateIdTokenAsync(It.IsAny<string>()))
-        .ThrowsAsync(new GoogleAuthException("Invalid token"));
+**Database Integration**:
+- Must verify new user is persisted to database with correct provider and externalUserId
+- Must verify refresh token is stored with hashed value (not plain text)
+- Must verify unique constraint on (Provider, ExternalUserId) prevents duplicates
+- Must verify foreign key cascade deletes refresh tokens when user deleted
 
-    var service = new AuthService(mockGoogleService.Object, ...);
-
-    // Act & Assert
-    await Assert.ThrowsAsync<GoogleAuthException>(() =>
-        service.LoginWithGoogleAsync("invalid-token"));
-}
-```
-
-### Integration Tests
-
-```csharp
-// IdentityService.Tests/Integration/AuthControllerTests.cs
-
-[Fact]
-public async Task GoogleLogin_WhenNewUser_ShouldCreateUserAndReturnTokens()
-{
-    // Arrange
-    var client = _factory.CreateClient();
-    var mockIdToken = CreateMockGoogleIdToken(); // Helper method
-
-    // Act
-    var response = await client.PostAsJsonAsync("/api/v1/auth/login/google",
-        new { idToken = mockIdToken });
-
-    // Assert
-    response.EnsureSuccessStatusCode();
-    var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
-
-    Assert.True(result.IsNewUser);
-    Assert.NotNull(result.AccessToken);
-
-    // Verify user in database
-    var user = await _dbContext.Users.FirstAsync(u => u.Email == "test@example.com");
-    Assert.NotNull(user);
-}
-```
+**Messaging Integration**:
+- Must verify UserRegistered event is published to message broker for new users
+- Must verify UserRegistered event includes userId, email, provider, registeredAt, correlationId
+- Must verify event is NOT published for existing users (only new registrations)
 
 ### Manual Testing Checklist
 

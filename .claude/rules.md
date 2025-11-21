@@ -296,16 +296,24 @@ QuietMatch uses a **hybrid feature-driven approach**:
 1. **Create Feature Folder and File**: `docs/40_features/f####_feature_name/`
    - Create folder for feature
    - Create feature file: `f####_feature_name.md` (use f0001 as template)
-   - Fill in ALL sections (acceptance criteria, API specs, diagrams, testing strategy)
-   - **🔒 Feature file is IMMUTABLE INPUT** - specifications defined before implementation
+   - **Fill with BUSINESS SPECIFICATIONS only**:
+     - ✅ Business goals, acceptance criteria (ALL of them), user stories (Gherkin)
+     - ✅ API specs (endpoints, request/response, errors), database schema (DDL)
+     - ✅ Sequence diagrams, events, configuration, testing REQUIREMENTS
+     - ❌ NO code implementations, test code, class names, package choices
+   - **🔒 Feature file is IMMUTABLE INPUT** - the WHAT, not the HOW
    - Commit to repository
 
 2. **Create Detailed Implementation Plan**: `plan.md` in same folder
    - **REQUIRED BEFORE CODING**
-   - Expand high-level checklist into detailed step-by-step tasks
-   - Add documentation references for each task
-   - Organize into phases (setup, domain, infrastructure, application, API, messaging, testing)
-   - **📝 Plan is LIVING DOCUMENT** - updated during implementation for progress tracking
+   - **VERY DETAILED, VERY SMART** roadmap applying all guidelines to THIS feature
+   - **What to include**:
+     - ✅ Phases by architecture layer, specific tasks with checkboxes
+     - ✅ Documentation references, WHY explanations, dependencies
+     - ✅ Entity/property lists, configuration details, test scenarios
+     - ✅ Architecture application, technical decisions
+     - ❌ NO complete class code, NO bash commands, NO full method bodies
+   - **📝 Plan is LIVING DOCUMENT** - detailed roadmap, updated for progress
    - Commit to repository
 
 3. **Create GitHub Issue**: Use issue template, reference feature file

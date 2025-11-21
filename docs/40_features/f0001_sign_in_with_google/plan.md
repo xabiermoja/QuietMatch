@@ -9,1363 +9,810 @@
 
 ---
 
+## Overview
+
+This plan provides a detailed, smart implementation roadmap for F0001 (Sign In with Google), applying all QuietMatch architecture guidelines, patterns, and best practices to this specific feature.
+
+**What this plan contains**:
+- Step-by-step tasks organized by architecture layers
+- Documentation references for each phase
+- Architecture reasoning (WHY we do things this way)
+- Entity/property specifications (WHAT to create)
+- Configuration details
+- Testing scenarios
+
+**What this plan does NOT contain**:
+- Complete class implementations (you'll write the code)
+- Full method bodies
+- Copy-paste bash commands (except key references)
+
+---
+
 ## Prerequisites
 
 ### Documentation to Review Before Starting
-- [ ] Read [Architecture Guidelines](../../10_architecture/02_architecture-guidelines.md) - Layered Architecture section
-- [ ] Read [Service Templates](../../10_architecture/03_service-templates.md) - Layered Architecture folder structure
-- [ ] Read [Security & Auth](../../10_architecture/05_security-and-auth.md) - Custom IdentityService design, JWT tokens, Google OAuth
-- [ ] Read [Messaging & Integration](../../10_architecture/06_messaging-and-integration.md) - Event publishing, outbox pattern
-- [ ] Read [Ubiquitous Language](../../20_domain/01_domain-ubiquitous-language.md) - Domain terminology
-- [ ] Read [Feature Specification](./f0001_sign_in_with_google.md) - Complete requirements
+- [ ] **Read completely**: [Feature Specification](./f0001_sign_in_with_google.md)
+- [ ] **Read**: [Architecture Guidelines - Layered Architecture](../../10_architecture/02_architecture-guidelines.md) (Sections on Layered pattern, why it's used for IdentityService)
+- [ ] **Read**: [Service Templates - Layered Folder Structure](../../10_architecture/03_service-templates.md) (Section 2: Layered Architecture example)
+- [ ] **Read**: [Security & Auth - Custom IdentityService](../../10_architecture/05_security-and-auth.md) (Sections on JWT, Google OAuth, refresh tokens)
+- [ ] **Read**: [Messaging & Integration - MassTransit](../../10_architecture/06_messaging-and-integration.md) (Event publishing, RabbitMQ/Azure Service Bus)
+- [ ] **Read**: [Ubiquitous Language](../../20_domain/01_domain-ubiquitous-language.md) (Domain terms used in this feature)
 
 ### Environment Setup
-- [ ] Docker Desktop running
+- [ ] Docker Desktop installed and running
 - [ ] Start infrastructure: `docker-compose up -d`
-- [ ] Verify PostgreSQL running: `psql -h localhost -U admin -d identity_db`
-- [ ] Verify RabbitMQ running: http://localhost:15672
-- [ ] Verify Redis running: `redis-cli ping`
+- [ ] Verify PostgreSQL running and accessible:
+  - Host: localhost:5432
+  - Database: identity_db
+  - User: admin
+  - Password: QuietMatch_Dev_2025!
+- [ ] Verify RabbitMQ running: http://localhost:15672 (guest/guest)
+- [ ] Verify Redis running: `redis-cli ping` returns PONG
 - [ ] Verify Seq running: http://localhost:5341
 
 ---
 
-## Phase 0: Setup (30 minutes)
+## Phase 0: Project Setup (30-45 minutes)
 
-### Create Project Structure
-**Reference**: [Service Templates - Layered Architecture](../../10_architecture/03_service-templates.md#layered-architecture)
+### Create Feature Branch
+- [ ] Create and checkout feature branch
+  - **Branch name**: `feature/f0001-sign-in-with-google`
+  - **Why**: Isolate feature development, enable PR workflow
 
-- [ ] Create feature branch
-  ```bash
-  git checkout -b feature/f0001-sign-in-with-google
-  ```
+### Create Solution and Projects
+- [ ] Navigate to `src/Services/` and create Identity folder
+- [ ] Create .NET solution file: `DatingApp.IdentityService.sln`
+- [ ] Create projects following Layered architecture:
+  - **DatingApp.IdentityService.Domain** (classlib) - Core entities, no dependencies
+  - **DatingApp.IdentityService.Application** (classlib) - Business logic
+  - **DatingApp.IdentityService.Infrastructure** (classlib) - External dependencies (DB, Google API)
+  - **DatingApp.IdentityService.Api** (webapi) - HTTP endpoints
+  - **DatingApp.IdentityService.Tests.Unit** (xunit) - Unit tests
+  - **DatingApp.IdentityService.Tests.Integration** (xunit) - Integration tests
+  - **Reference**: [Service Templates - Layered Project Structure](../../10_architecture/03_service-templates.md)
 
-- [ ] Create solution and projects
-  ```bash
-  cd src/Services
-  mkdir Identity
-  cd Identity
+### Configure Project References
+- [ ] Set up dependency chain (Layered pattern - unidirectional dependencies):
+  - **API** → Application + Infrastructure
+  - **Application** → Domain
+  - **Infrastructure** → Domain
+  - **Tests.Unit** → Application
+  - **Tests.Integration** → API
+  - **Why**: Layered architecture enforces dependencies flow downward, Domain has no dependencies
 
-  # Create solution
-  dotnet new sln -n DatingApp.IdentityService
+### Install NuGet Packages
+- [ ] Domain layer packages:
+  - (None - keep domain pure, no external dependencies)
 
-  # Create projects (Layered architecture - top to bottom)
-  dotnet new webapi -n DatingApp.IdentityService.Api
-  dotnet new classlib -n DatingApp.IdentityService.Application
-  dotnet new classlib -n DatingApp.IdentityService.Domain
-  dotnet new classlib -n DatingApp.IdentityService.Infrastructure
+- [ ] Application layer packages:
+  - FluentValidation (for input validation)
+  - MediatR (if using CQRS commands/queries - optional for this feature)
 
-  # Create test projects
-  dotnet new xunit -n DatingApp.IdentityService.Tests.Unit
-  dotnet new xunit -n DatingApp.IdentityService.Tests.Integration
+- [ ] Infrastructure layer packages:
+  - Npgsql.EntityFrameworkCore.PostgreSQL (database)
+  - Microsoft.EntityFrameworkCore.Design (migrations)
+  - Google.Apis.Auth (Google ID token validation)
+  - MassTransit.RabbitMQ (messaging)
 
-  # Add projects to solution
-  dotnet sln add **/*.csproj
-  ```
+- [ ] API layer packages:
+  - Microsoft.AspNetCore.Authentication.JwtBearer (JWT middleware)
+  - Serilog.AspNetCore (structured logging)
+  - Serilog.Sinks.Seq (log shipping)
+  - AspNetCoreRateLimit (rate limiting)
+  - Swashbuckle.AspNetCore (Swagger/OpenAPI)
 
-- [ ] Set up project references (Layered dependencies)
-  ```bash
-  # API depends on Application
-  dotnet add DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj reference DatingApp.IdentityService.Application/DatingApp.IdentityService.Application.csproj
+- [ ] Test packages:
+  - Moq (mocking)
+  - FluentAssertions (readable assertions)
+  - Testcontainers.PostgreSql (real database for integration tests)
+  - Testcontainers.RabbitMq (real message broker for integration tests)
+  - Microsoft.AspNetCore.Mvc.Testing (API testing)
 
-  # Application depends on Domain
-  dotnet add DatingApp.IdentityService.Application/DatingApp.IdentityService.Application.csproj reference DatingApp.IdentityService.Domain/DatingApp.IdentityService.Domain.csproj
+### Create PATTERNS.md
+- [ ] Create `src/Services/Identity/PATTERNS.md` explaining:
+  - Why Layered architecture chosen for IdentityService (simple CRUD, clear separation)
+  - Folder structure breakdown
+  - Layer responsibilities
+  - Dependency rules
+  - Alternative patterns considered (Onion, Hexagonal) and why not chosen
+  - **Reference**: [Architecture Guidelines - Pattern Selection](../../10_architecture/02_architecture-guidelines.md)
 
-  # Infrastructure depends on Domain (implements interfaces)
-  dotnet add DatingApp.IdentityService.Infrastructure/DatingApp.IdentityService.Infrastructure.csproj reference DatingApp.IdentityService.Domain/DatingApp.IdentityService.Domain.csproj
-
-  # API depends on Infrastructure (DI registration)
-  dotnet add DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj reference DatingApp.IdentityService.Infrastructure/DatingApp.IdentityService.Infrastructure.csproj
-
-  # Test projects
-  dotnet add DatingApp.IdentityService.Tests.Unit/*.csproj reference DatingApp.IdentityService.Application/*.csproj
-  dotnet add DatingApp.IdentityService.Tests.Integration/*.csproj reference DatingApp.IdentityService.Api/*.csproj
-  ```
-
-- [ ] Install NuGet packages
-  ```bash
-  # Domain (minimal, no dependencies)
-  # (No external packages needed)
-
-  # Infrastructure
-  cd DatingApp.IdentityService.Infrastructure
-  dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL
-  dotnet add package Microsoft.EntityFrameworkCore.Design
-  dotnet add package Google.Apis.Auth --version 1.68.0
-  dotnet add package MassTransit.RabbitMQ
-
-  # Application
-  cd ../DatingApp.IdentityService.Application
-  dotnet add package FluentValidation
-  dotnet add package MediatR
-
-  # API
-  cd ../DatingApp.IdentityService.Api
-  dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
-  dotnet add package Serilog.AspNetCore
-  dotnet add package Serilog.Sinks.Seq
-  dotnet add package Swashbuckle.AspNetCore
-  dotnet add package AspNetCoreRateLimit
-
-  # Tests
-  cd ../DatingApp.IdentityService.Tests.Unit
-  dotnet add package Moq
-  dotnet add package FluentAssertions
-
-  cd ../DatingApp.IdentityService.Tests.Integration
-  dotnet add package Microsoft.AspNetCore.Mvc.Testing
-  dotnet add package Testcontainers.PostgreSql
-  dotnet add package Testcontainers.RabbitMq
-  ```
-
-- [ ] Create PATTERNS.md in Identity folder
-  - Explain Layered architecture choice
-  - Document folder structure
-  - Reference architecture guidelines
-
-- [ ] Commit setup
-  ```bash
-  git add src/Services/Identity/
-  git commit -m "feat(identity): initial project structure for F0001 (#issue-number)"
-  ```
+### Initial Commit
+- [ ] Commit project structure
+  - Message: `feat(identity): initial project structure for F0001 (#issue-number)`
 
 ---
 
 ## Phase 1: Domain Layer (1 hour)
 
-**Reference**: [Service Templates - Domain Layer](../../10_architecture/03_service-templates.md#domain-layer)
-**Why Domain First**: Layered architecture starts with core entities (no dependencies)
+**Reference**: [Architecture Guidelines - Domain Layer](../../10_architecture/02_architecture-guidelines.md)
+**Why Domain First**: In Layered architecture, domain is the foundation - no dependencies, pure business logic
+
+### Create AuthProvider Enum
+- [ ] Create enum in Domain layer
+  - **Namespace**: `DatingApp.IdentityService.Domain.Enums`
+  - **Values**: Google, Apple
+  - **Why**: Type-safe provider identification, extensible for future providers
+  - **Reference**: [Ubiquitous Language - AuthProvider](../../20_domain/01_domain-ubiquitous-language.md)
 
 ### Create User Entity
-**Reference**: [Feature Spec - Database Schema](./f0001_sign_in_with_google.md#database-changes) (lines 244-257)
-
-- [ ] Create `Entities/User.cs`
-  ```csharp
-  namespace DatingApp.IdentityService.Domain.Entities;
-
-  public class User
-  {
-      public Guid Id { get; private set; }
-      public string Email { get; private set; }
-      public AuthProvider Provider { get; private set; }
-      public string ExternalUserId { get; private set; }
-      public DateTime CreatedAt { get; private set; }
-      public DateTime? LastLoginAt { get; private set; }
-
-      private User() { } // EF Core
-
-      public static User CreateFromGoogle(string email, string googleUserId)
-      {
-          return new User
-          {
-              Id = Guid.NewGuid(),
-              Email = email,
-              Provider = AuthProvider.Google,
-              ExternalUserId = googleUserId,
-              CreatedAt = DateTime.UtcNow
-          };
-      }
-
-      public void RecordLogin()
-      {
-          LastLoginAt = DateTime.UtcNow;
-      }
-  }
-  ```
-
-- [ ] Create `Enums/AuthProvider.cs`
-  ```csharp
-  namespace DatingApp.IdentityService.Domain.Enums;
-
-  public enum AuthProvider
-  {
-      Google,
-      Apple
-  }
-  ```
+- [ ] Create User entity in Domain layer
+  - **Namespace**: `DatingApp.IdentityService.Domain.Entities`
+  - **Properties**:
+    - `Id` (Guid) - Primary key
+    - `Email` (string) - User email from OAuth provider
+    - `Provider` (AuthProvider enum) - Google or Apple
+    - `ExternalUserId` (string) - Provider's user ID (Google sub claim)
+    - `CreatedAt` (DateTime) - Registration timestamp
+    - `LastLoginAt` (DateTime?) - Last successful login (nullable)
+  - **Business Rules**:
+    - Private parameterless constructor for EF Core
+    - Static factory method `CreateFromGoogle(string email, string googleUserId)` - returns new User with Provider=Google
+    - Instance method `RecordLogin()` - sets LastLoginAt to UtcNow
+  - **Why**: Rich domain model encapsulates User creation and login logic
+  - **Reference**: [Feature Spec - Database Schema](./f0001_sign_in_with_google.md) (lines 244-257)
+  - **Reference**: [Ubiquitous Language - User](../../20_domain/01_domain-ubiquitous-language.md)
 
 ### Create RefreshToken Entity
-**Reference**: [Feature Spec - Database Schema](./f0001_sign_in_with_google.md#database-changes) (lines 260-274)
-
-- [ ] Create `Entities/RefreshToken.cs`
-  ```csharp
-  namespace DatingApp.IdentityService.Domain.Entities;
-
-  public class RefreshToken
-  {
-      public Guid Id { get; private set; }
-      public Guid UserId { get; private set; }
-      public string TokenHash { get; private set; }
-      public DateTime ExpiresAt { get; private set; }
-      public DateTime CreatedAt { get; private set; }
-      public DateTime? RevokedAt { get; private set; }
-      public bool IsRevoked { get; private set; }
-
-      // Navigation
-      public User User { get; private set; }
-
-      private RefreshToken() { } // EF Core
-
-      public static RefreshToken Create(Guid userId, string tokenHash, int validityDays)
-      {
-          return new RefreshToken
-          {
-              Id = Guid.NewGuid(),
-              UserId = userId,
-              TokenHash = tokenHash,
-              ExpiresAt = DateTime.UtcNow.AddDays(validityDays),
-              CreatedAt = DateTime.UtcNow,
-              IsRevoked = false
-          };
-      }
-
-      public void Revoke()
-      {
-          IsRevoked = true;
-          RevokedAt = DateTime.UtcNow;
-      }
-
-      public bool IsValid() => !IsRevoked && DateTime.UtcNow < ExpiresAt;
-  }
-  ```
+- [ ] Create RefreshToken entity in Domain layer
+  - **Namespace**: `DatingApp.IdentityService.Domain.Entities`
+  - **Properties**:
+    - `Id` (Guid) - Primary key
+    - `UserId` (Guid) - Foreign key to User
+    - `TokenHash` (string) - SHA-256 hash of refresh token (never store plain text)
+    - `ExpiresAt` (DateTime) - Token expiration timestamp
+    - `CreatedAt` (DateTime) - Creation timestamp
+    - `RevokedAt` (DateTime?) - Revocation timestamp (nullable)
+    - `IsRevoked` (bool) - Revocation flag
+    - `User` (User) - Navigation property to User
+  - **Business Rules**:
+    - Private parameterless constructor for EF Core
+    - Static factory method `Create(Guid userId, string tokenHash, int validityDays)` - creates token with expiry
+    - Instance method `Revoke()` - sets IsRevoked=true, RevokedAt=UtcNow
+    - Instance method `IsValid()` - returns false if revoked or expired
+  - **Why**: Encapsulates refresh token lifecycle, ensures tokens can't be used past expiry/revocation
+  - **Security**: Token hash (not plain text) prevents theft if database compromised
+  - **Reference**: [Feature Spec - Database Schema](./f0001_sign_in_with_google.md) (lines 260-274)
+  - **Reference**: [Security & Auth - Refresh Tokens](../../10_architecture/05_security-and-auth.md)
 
 ### Create Repository Interfaces
-**Reference**: [Architecture Guidelines - Repository Pattern](../../10_architecture/02_architecture-guidelines.md#repository-pattern)
-**Why in Domain**: Interfaces defined in domain, implemented in infrastructure (Layered pattern)
+- [ ] Create `IUserRepository` interface in Domain layer
+  - **Namespace**: `DatingApp.IdentityService.Domain.Repositories`
+  - **Methods**:
+    - `Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)`
+    - `Task<User?> GetByExternalUserIdAsync(AuthProvider provider, string externalUserId, CancellationToken ct = default)`
+    - `Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)`
+    - `Task AddAsync(User user, CancellationToken ct = default)`
+    - `Task UpdateAsync(User user, CancellationToken ct = default)`
+  - **Why**: Interface in Domain (dependency inversion), implementation in Infrastructure
+  - **Reference**: [Architecture Guidelines - Repository Pattern](../../10_architecture/02_architecture-guidelines.md)
 
-- [ ] Create `Repositories/IUserRepository.cs`
-  ```csharp
-  namespace DatingApp.IdentityService.Domain.Repositories;
+- [ ] Create `IRefreshTokenRepository` interface in Domain layer
+  - **Namespace**: `DatingApp.IdentityService.Domain.Repositories`
+  - **Methods**:
+    - `Task<RefreshToken?> GetByTokenHashAsync(string tokenHash, CancellationToken ct = default)`
+    - `Task<IEnumerable<RefreshToken>> GetActiveByUserIdAsync(Guid userId, CancellationToken ct = default)`
+    - `Task AddAsync(RefreshToken token, CancellationToken ct = default)`
+    - `Task UpdateAsync(RefreshToken token, CancellationToken ct = default)`
+  - **Why**: Separate repository for token management, support querying active tokens for security audit
 
-  public interface IUserRepository
-  {
-      Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default);
-      Task<User?> GetByExternalUserIdAsync(AuthProvider provider, string externalUserId, CancellationToken ct = default);
-      Task<User?> GetByEmailAsync(string email, CancellationToken ct = default);
-      Task AddAsync(User user, CancellationToken ct = default);
-      Task UpdateAsync(User user, CancellationToken ct = default);
-  }
-  ```
-
-- [ ] Create `Repositories/IRefreshTokenRepository.cs`
-  ```csharp
-  namespace DatingApp.IdentityService.Domain.Repositories;
-
-  public interface IRefreshTokenRepository
-  {
-      Task<RefreshToken?> GetByTokenHashAsync(string tokenHash, CancellationToken ct = default);
-      Task<IEnumerable<RefreshToken>> GetActiveByUserIdAsync(Guid userId, CancellationToken ct = default);
-      Task AddAsync(RefreshToken token, CancellationToken ct = default);
-      Task UpdateAsync(RefreshToken token, CancellationToken ct = default);
-  }
-  ```
-
-- [ ] Commit domain layer
-  ```bash
-  git add src/Services/Identity/DatingApp.IdentityService.Domain/
-  git commit -m "feat(identity): add User and RefreshToken domain entities (#issue-number)"
-  ```
+### Commit Domain Layer
+- [ ] Commit domain entities and interfaces
+  - Message: `feat(identity): add User and RefreshToken domain entities (#issue-number)`
 
 ---
 
-## Phase 2: Infrastructure Layer - Persistence (1 hour)
+## Phase 2: Infrastructure Layer - Persistence (1-1.5 hours)
 
-**Reference**: [Service Templates - Infrastructure Layer](../../10_architecture/03_service-templates.md#infrastructure-layer)
+**Reference**: [Service Templates - Infrastructure Layer](../../10_architecture/03_service-templates.md)
+**Reference**: [Architecture Guidelines - EF Core Configuration](../../10_architecture/02_architecture-guidelines.md)
 
-### Set Up Database Context
-**Reference**: [Architecture Guidelines - EF Core Setup](../../10_architecture/02_architecture-guidelines.md#entity-framework-core)
+### Create DbContext
+- [ ] Create `IdentityDbContext` in Infrastructure layer
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Data`
+  - **Inherits**: `DbContext`
+  - **DbSets**: `DbSet<User> Users`, `DbSet<RefreshToken> RefreshTokens`
+  - **OnModelCreating**: Apply all entity configurations from assembly
+  - **Why**: Centralized database configuration, enables EF Core conventions
 
-- [ ] Create `Data/IdentityDbContext.cs`
-  ```csharp
-  using Microsoft.EntityFrameworkCore;
-  using DatingApp.IdentityService.Domain.Entities;
+### Create Entity Configurations
+- [ ] Create `UserConfiguration` (IEntityTypeConfiguration<User>)
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Data.Configurations`
+  - **Table name**: `users`
+  - **Property configurations**:
+    - Id: Primary key
+    - Email: Required, MaxLength(255), Index
+    - Provider: Required, Convert to string, MaxLength(50)
+    - ExternalUserId: Required, MaxLength(255)
+    - CreatedAt: Required
+    - LastLoginAt: Optional
+  - **Constraints**:
+    - Unique index on (Provider, ExternalUserId) - prevent duplicate users from same provider
+  - **Why**: Fluent API for precise database schema control
+  - **Reference**: [Feature Spec - Database Schema DDL](./f0001_sign_in_with_google.md) (lines 244-257)
 
-  namespace DatingApp.IdentityService.Infrastructure.Data;
-
-  public class IdentityDbContext : DbContext
-  {
-      public IdentityDbContext(DbContextOptions<IdentityDbContext> options)
-          : base(options)
-      {
-      }
-
-      public DbSet<User> Users => Set<User>();
-      public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
-
-      protected override void OnModelCreating(ModelBuilder modelBuilder)
-      {
-          base.OnModelCreating(modelBuilder);
-
-          // Apply configurations
-          modelBuilder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
-      }
-  }
-  ```
-
-- [ ] Create `Data/Configurations/UserConfiguration.cs`
-  ```csharp
-  using Microsoft.EntityFrameworkCore;
-  using Microsoft.EntityFrameworkCore.Metadata.Builders;
-  using DatingApp.IdentityService.Domain.Entities;
-
-  namespace DatingApp.IdentityService.Infrastructure.Data.Configurations;
-
-  public class UserConfiguration : IEntityTypeConfiguration<User>
-  {
-      public void Configure(EntityTypeBuilder<User> builder)
-      {
-          builder.ToTable("users");
-
-          builder.HasKey(u => u.Id);
-
-          builder.Property(u => u.Email)
-              .IsRequired()
-              .HasMaxLength(255);
-
-          builder.Property(u => u.Provider)
-              .IsRequired()
-              .HasConversion<string>()
-              .HasMaxLength(50);
-
-          builder.Property(u => u.ExternalUserId)
-              .IsRequired()
-              .HasMaxLength(255);
-
-          builder.Property(u => u.CreatedAt)
-              .IsRequired();
-
-          // Unique constraint
-          builder.HasIndex(u => new { u.Provider, u.ExternalUserId })
-              .IsUnique()
-              .HasDatabaseName("unique_provider_user");
-
-          builder.HasIndex(u => u.Email)
-              .HasDatabaseName("idx_users_email");
-      }
-  }
-  ```
-
-- [ ] Create `Data/Configurations/RefreshTokenConfiguration.cs`
-  ```csharp
-  using Microsoft.EntityFrameworkCore;
-  using Microsoft.EntityFrameworkCore.Metadata.Builders;
-  using DatingApp.IdentityService.Domain.Entities;
-
-  namespace DatingApp.IdentityService.Infrastructure.Data.Configurations;
-
-  public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
-  {
-      public void Configure(EntityTypeBuilder<RefreshToken> builder)
-      {
-          builder.ToTable("refresh_tokens");
-
-          builder.HasKey(rt => rt.Id);
-
-          builder.Property(rt => rt.TokenHash)
-              .IsRequired()
-              .HasMaxLength(255);
-
-          builder.Property(rt => rt.ExpiresAt)
-              .IsRequired();
-
-          builder.Property(rt => rt.CreatedAt)
-              .IsRequired();
-
-          builder.Property(rt => rt.IsRevoked)
-              .IsRequired();
-
-          // Unique constraint
-          builder.HasIndex(rt => rt.TokenHash)
-              .IsUnique()
-              .HasDatabaseName("unique_token_hash");
-
-          builder.HasIndex(rt => rt.UserId)
-              .HasDatabaseName("idx_refresh_tokens_user_id");
-
-          builder.HasIndex(rt => rt.ExpiresAt)
-              .HasDatabaseName("idx_refresh_tokens_expires_at");
-
-          // Relationship
-          builder.HasOne(rt => rt.User)
-              .WithMany()
-              .HasForeignKey(rt => rt.UserId)
-              .OnDelete(DeleteBehavior.Cascade);
-      }
-  }
-  ```
+- [ ] Create `RefreshTokenConfiguration` (IEntityTypeConfiguration<RefreshToken>)
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Data.Configurations`
+  - **Table name**: `refresh_tokens`
+  - **Property configurations**:
+    - Id: Primary key
+    - UserId: Foreign key, Index
+    - TokenHash: Required, MaxLength(255), Unique index
+    - ExpiresAt: Required, Index (for efficient expiry queries)
+    - CreatedAt: Required
+    - RevokedAt: Optional
+    - IsRevoked: Required, Default false
+  - **Relationships**:
+    - Many-to-one with User, OnDelete(Cascade) - delete tokens when user deleted
+  - **Why**: Indexes optimize lookups, unique constraint prevents token reuse
+  - **Reference**: [Feature Spec - Database Schema DDL](./f0001_sign_in_with_google.md) (lines 260-274)
 
 ### Implement Repositories
-**Reference**: [Architecture Guidelines - Repository Implementation](../../10_architecture/02_architecture-guidelines.md#repository-implementation)
+- [ ] Create `UserRepository` implementing `IUserRepository`
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Repositories`
+  - **Constructor**: Inject `IdentityDbContext`
+  - **Implement all methods** from interface:
+    - Use `FindAsync` for GetByIdAsync (fast primary key lookup)
+    - Use `FirstOrDefaultAsync` with predicate for provider/email lookups
+    - Use `AddAsync` + `SaveChangesAsync` for Add
+    - Use `Update` + `SaveChangesAsync` for Update
+  - **Why**: Repository pattern abstracts data access, enables testing with mocks
 
-- [ ] Create `Repositories/UserRepository.cs`
-  ```csharp
-  using Microsoft.EntityFrameworkCore;
-  using DatingApp.IdentityService.Domain.Entities;
-  using DatingApp.IdentityService.Domain.Repositories;
-  using DatingApp.IdentityService.Infrastructure.Data;
+- [ ] Create `RefreshTokenRepository` implementing `IRefreshTokenRepository`
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Repositories`
+  - **Constructor**: Inject `IdentityDbContext`
+  - **GetActiveByUserIdAsync**: Filter where `!IsRevoked && ExpiresAt > UtcNow`
+  - **Why**: Encapsulates token queries, business logic stays in domain
 
-  namespace DatingApp.IdentityService.Infrastructure.Repositories;
+### Create EF Core Migration
+- [ ] Run `dotnet ef migrations add InitialCreate`
+  - From: Infrastructure project
+  - Startup project: API project
+  - **Migration name**: `InitialCreate`
+- [ ] Review generated migration SQL - verify matches feature spec DDL
+- [ ] Run `dotnet ef database update` to apply migration to local `identity_db`
+- [ ] Verify tables created: Connect to PostgreSQL and check `users` and `refresh_tokens` tables exist
+  - **Reference**: [Feature Spec - Database Schema](./f0001_sign_in_with_google.md)
 
-  public class UserRepository : IUserRepository
-  {
-      private readonly IdentityDbContext _context;
-
-      public UserRepository(IdentityDbContext context)
-      {
-          _context = context;
-      }
-
-      public async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
-      {
-          return await _context.Users.FindAsync(new object[] { id }, ct);
-      }
-
-      public async Task<User?> GetByExternalUserIdAsync(AuthProvider provider, string externalUserId, CancellationToken ct = default)
-      {
-          return await _context.Users
-              .FirstOrDefaultAsync(u => u.Provider == provider && u.ExternalUserId == externalUserId, ct);
-      }
-
-      public async Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
-      {
-          return await _context.Users
-              .FirstOrDefaultAsync(u => u.Email == email, ct);
-      }
-
-      public async Task AddAsync(User user, CancellationToken ct = default)
-      {
-          await _context.Users.AddAsync(user, ct);
-          await _context.SaveChangesAsync(ct);
-      }
-
-      public async Task UpdateAsync(User user, CancellationToken ct = default)
-      {
-          _context.Users.Update(user);
-          await _context.SaveChangesAsync(ct);
-      }
-  }
-  ```
-
-- [ ] Create `Repositories/RefreshTokenRepository.cs`
-  ```csharp
-  using Microsoft.EntityFrameworkCore;
-  using DatingApp.IdentityService.Domain.Entities;
-  using DatingApp.IdentityService.Domain.Repositories;
-  using DatingApp.IdentityService.Infrastructure.Data;
-
-  namespace DatingApp.IdentityService.Infrastructure.Repositories;
-
-  public class RefreshTokenRepository : IRefreshTokenRepository
-  {
-      private readonly IdentityDbContext _context;
-
-      public RefreshTokenRepository(IdentityDbContext context)
-      {
-          _context = context;
-      }
-
-      public async Task<RefreshToken?> GetByTokenHashAsync(string tokenHash, CancellationToken ct = default)
-      {
-          return await _context.RefreshTokens
-              .Include(rt => rt.User)
-              .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash, ct);
-      }
-
-      public async Task<IEnumerable<RefreshToken>> GetActiveByUserIdAsync(Guid userId, CancellationToken ct = default)
-      {
-          return await _context.RefreshTokens
-              .Where(rt => rt.UserId == userId && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow)
-              .ToListAsync(ct);
-      }
-
-      public async Task AddAsync(RefreshToken token, CancellationToken ct = default)
-      {
-          await _context.RefreshTokens.AddAsync(token, ct);
-          await _context.SaveChangesAsync(ct);
-      }
-
-      public async Task UpdateAsync(RefreshToken token, CancellationToken ct = default)
-      {
-          _context.RefreshTokens.Update(token);
-          await _context.SaveChangesAsync(ct);
-      }
-  }
-  ```
-
-### Create Database Migration
-**Reference**: [Feature Spec - Database Schema](./f0001_sign_in_with_google.md#database-changes)
-
-- [ ] Create migration
-  ```bash
-  cd src/Services/Identity/DatingApp.IdentityService.Infrastructure
-  dotnet ef migrations add InitialCreate \
-      --startup-project ../DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj \
-      --context IdentityDbContext
-  ```
-
-- [ ] Review generated migration SQL
-- [ ] Apply migration to local database
-  ```bash
-  dotnet ef database update \
-      --startup-project ../DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj \
-      --context IdentityDbContext
-  ```
-
-- [ ] Verify tables created
-  ```bash
-  psql -h localhost -U admin -d identity_db -c "\dt"
-  ```
-
-- [ ] Commit persistence layer
-  ```bash
-  git add src/Services/Identity/DatingApp.IdentityService.Infrastructure/
-  git commit -m "feat(identity): add EF Core database context and repositories (#issue-number)"
-  ```
+### Commit Persistence Layer
+- [ ] Commit DbContext, configurations, repositories, migration
+  - Message: `feat(identity): add EF Core persistence layer with migrations (#issue-number)`
 
 ---
 
-## Phase 3: Infrastructure Layer - External Services (1.5 hours)
+## Phase 3: Infrastructure Layer - External Services (1-1.5 hours)
 
-**Reference**: [Security & Auth - Google OAuth](../../10_architecture/05_security-and-auth.md#google-oauth)
+**Reference**: [Security & Auth - Google OAuth](../../10_architecture/05_security-and-auth.md)
+**Reference**: [Security & Auth - JWT Implementation](../../10_architecture/05_security-and-auth.md)
 
-### Implement Google Authentication Service
-**Reference**: [Feature Spec - API Specification](./f0001_sign_in_with_google.md#api-specification)
+### Create Google OAuth Service
+- [ ] Create `IGoogleAuthService` interface
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Services`
+  - **Method**: `Task<GoogleUserInfo?> ValidateIdTokenAsync(string idToken, CancellationToken ct = default)`
+  - **Return type**: `GoogleUserInfo` record with properties: Sub (string), Email (string), Name (string), EmailVerified (bool)
+  - **Why**: Abstracts Google API, enables testing with mocks
 
-- [ ] Create `Services/IGoogleAuthService.cs` interface
-  ```csharp
-  namespace DatingApp.IdentityService.Infrastructure.Services;
+- [ ] Implement `GoogleAuthService`
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Services`
+  - **Constructor**: Inject `IConfiguration`, `ILogger<GoogleAuthService>`
+  - **Configuration**: Read Google:ClientId from appsettings
+  - **Implementation**:
+    - Use `Google.Apis.Auth.GoogleJsonWebSignature.ValidateAsync()`
+    - Validate against clientId (audience claim)
+    - Return GoogleUserInfo on success
+    - Return null or throw on invalid token
+    - Log validation attempts
+  - **Security**: Server-side validation prevents client token tampering
+  - **Reference**: [Feature Spec - AC6](./f0001_sign_in_with_google.md) (Validate ID token with Google API)
+  - **Reference**: [Security & Auth - Google OAuth Validation](../../10_architecture/05_security-and-auth.md)
 
-  public interface IGoogleAuthService
-  {
-      Task<GoogleUserInfo?> ValidateIdTokenAsync(string idToken, CancellationToken ct = default);
-  }
+### Create JWT Token Generator
+- [ ] Create `IJwtTokenGenerator` interface
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Services`
+  - **Methods**:
+    - `string GenerateAccessToken(Guid userId, string email)`
+    - `string GenerateRefreshToken()`
+    - `string HashToken(string token)` - SHA-256 hash for storage
+  - **Why**: Abstracts token generation, supports testing
 
-  public record GoogleUserInfo(
-      string Sub,        // Google User ID
-      string Email,
-      string Name,
-      bool EmailVerified
-  );
-  ```
+- [ ] Implement `JwtTokenGenerator`
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Services`
+  - **Constructor**: Inject `IConfiguration`
+  - **Configuration**: Read from appsettings:
+    - Jwt:SecretKey (256-bit key)
+    - Jwt:Issuer (e.g., "https://quietmatch.com")
+    - Jwt:Audience (e.g., "https://api.quietmatch.com")
+    - Jwt:AccessTokenExpiryMinutes (15 minutes)
+  - **GenerateAccessToken**:
+    - Claims: sub (userId), email, jti (unique token ID), iat (issued at)
+    - Algorithm: HMAC-SHA256
+    - Expiry: 15 minutes from now
+    - Use `JwtSecurityTokenHandler` to write token
+  - **GenerateRefreshToken**:
+    - Generate 32 random bytes using `RandomNumberGenerator`
+    - Convert to Base64 string
+  - **HashToken**:
+    - Use `SHA256.ComputeHash()` on token bytes
+    - Return Base64-encoded hash
+  - **Why**: JWT access token for API auth, refresh token for session renewal
+  - **Security**: Refresh tokens hashed before storage (theft mitigation)
+  - **Reference**: [Feature Spec - AC9, AC10](./f0001_sign_in_with_google.md)
+  - **Reference**: [Security & Auth - JWT Configuration](../../10_architecture/05_security-and-auth.md)
 
-- [ ] Create `Services/GoogleAuthService.cs` implementation
-  ```csharp
-  using Google.Apis.Auth;
-  using Microsoft.Extensions.Configuration;
-  using Microsoft.Extensions.Logging;
-
-  namespace DatingApp.IdentityService.Infrastructure.Services;
-
-  public class GoogleAuthService : IGoogleAuthService
-  {
-      private readonly string _clientId;
-      private readonly ILogger<GoogleAuthService> _logger;
-
-      public GoogleAuthService(IConfiguration config, ILogger<GoogleAuthService> logger)
-      {
-          _clientId = config["Google:ClientId"]
-              ?? throw new InvalidOperationException("Google:ClientId not configured");
-          _logger = logger;
-      }
-
-      public async Task<GoogleUserInfo?> ValidateIdTokenAsync(string idToken, CancellationToken ct = default)
-      {
-          try
-          {
-              var payload = await GoogleJsonWebSignature.ValidateAsync(idToken, new GoogleJsonWebSignature.ValidationSettings
-              {
-                  Audience = new[] { _clientId }
-              });
-
-              return new GoogleUserInfo(
-                  payload.Subject,
-                  payload.Email,
-                  payload.Name,
-                  payload.EmailVerified
-              );
-          }
-          catch (InvalidJwtException ex)
-          {
-              _logger.LogWarning(ex, "Invalid Google ID token");
-              return null;
-          }
-      }
-  }
-  ```
-
-### Implement JWT Token Generator
-**Reference**: [Security & Auth - JWT Implementation](../../10_architecture/05_security-and-auth.md#jwt-tokens)
-
-- [ ] Create `Services/IJwtTokenGenerator.cs` interface
-  ```csharp
-  namespace DatingApp.IdentityService.Infrastructure.Services;
-
-  public interface IJwtTokenGenerator
-  {
-      string GenerateAccessToken(Guid userId, string email);
-      string GenerateRefreshToken();
-      string HashToken(string token);
-  }
-  ```
-
-- [ ] Create `Services/JwtTokenGenerator.cs` implementation
-  ```csharp
-  using System.IdentityModel.Tokens.Jwt;
-  using System.Security.Claims;
-  using System.Security.Cryptography;
-  using Microsoft.Extensions.Configuration;
-  using Microsoft.IdentityModel.Tokens;
-  using System.Text;
-
-  namespace DatingApp.IdentityService.Infrastructure.Services;
-
-  public class JwtTokenGenerator : IJwtTokenGenerator
-  {
-      private readonly string _secretKey;
-      private readonly string _issuer;
-      private readonly string _audience;
-      private readonly int _accessTokenExpiryMinutes;
-
-      public JwtTokenGenerator(IConfiguration config)
-      {
-          _secretKey = config["Jwt:SecretKey"]
-              ?? throw new InvalidOperationException("Jwt:SecretKey not configured");
-          _issuer = config["Jwt:Issuer"] ?? "https://quietmatch.com";
-          _audience = config["Jwt:Audience"] ?? "https://api.quietmatch.com";
-          _accessTokenExpiryMinutes = int.Parse(config["Jwt:AccessTokenExpiryMinutes"] ?? "15");
-      }
-
-      public string GenerateAccessToken(Guid userId, string email)
-      {
-          var claims = new[]
-          {
-              new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
-              new Claim(JwtRegisteredClaimNames.Email, email),
-              new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-              new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString())
-          };
-
-          var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey));
-          var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-          var token = new JwtSecurityToken(
-              issuer: _issuer,
-              audience: _audience,
-              claims: claims,
-              expires: DateTime.UtcNow.AddMinutes(_accessTokenExpiryMinutes),
-              signingCredentials: creds
-          );
-
-          return new JwtSecurityTokenHandler().WriteToken(token);
-      }
-
-      public string GenerateRefreshToken()
-      {
-          var randomBytes = new byte[32];
-          using var rng = RandomNumberGenerator.Create();
-          rng.GetBytes(randomBytes);
-          return Convert.ToBase64String(randomBytes);
-      }
-
-      public string HashToken(string token)
-      {
-          using var sha256 = SHA256.Create();
-          var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(token));
-          return Convert.ToBase64String(hashBytes);
-      }
-  }
-  ```
-
-- [ ] Commit external services
-  ```bash
-  git add src/Services/Identity/DatingApp.IdentityService.Infrastructure/
-  git commit -m "feat(identity): add Google OAuth and JWT token services (#issue-number)"
-  ```
+### Commit External Services
+- [ ] Commit Google OAuth and JWT services
+  - Message: `feat(identity): add Google OAuth and JWT token services (#issue-number)`
 
 ---
 
 ## Phase 4: Application Layer (1 hour)
 
-**Reference**: [Service Templates - Application Layer](../../10_architecture/03_service-templates.md#application-layer)
+**Reference**: [Service Templates - Application Layer](../../10_architecture/03_service-templates.md)
+**Reference**: [Feature Spec - Acceptance Criteria](./f0001_sign_in_with_google.md)
 
 ### Create DTOs
-- [ ] Create `DTOs/LoginWithGoogleRequest.cs`
-  ```csharp
-  namespace DatingApp.IdentityService.Application.DTOs;
+- [ ] Create `LoginWithGoogleRequest` record
+  - **Namespace**: `DatingApp.IdentityService.Application.DTOs`
+  - **Properties**: `string IdToken`
+  - **Why**: Input DTO for API endpoint
 
-  public record LoginWithGoogleRequest(string IdToken);
-  ```
+- [ ] Create `LoginResponse` record
+  - **Namespace**: `DatingApp.IdentityService.Application.DTOs`
+  - **Properties**:
+    - `string AccessToken` - JWT for API authentication
+    - `string RefreshToken` - For session renewal
+    - `int ExpiresIn` - Access token TTL in seconds (900 = 15 min)
+    - `string TokenType` - "Bearer"
+    - `Guid UserId` - User identifier
+    - `bool IsNewUser` - True if first login (triggers profile creation flow)
+    - `string Email` - User email
+  - **Why**: Structured response matching feature spec API contract
+  - **Reference**: [Feature Spec - API Specification](./f0001_sign_in_with_google.md) (lines 136-158)
 
-- [ ] Create `DTOs/LoginResponse.cs`
-  ```csharp
-  namespace DatingApp.IdentityService.Application.DTOs;
+### Create AuthService
+- [ ] Create `AuthService` class
+  - **Namespace**: `DatingApp.IdentityService.Application.Services`
+  - **Constructor**: Inject:
+    - `IGoogleAuthService` - For ID token validation
+    - `IJwtTokenGenerator` - For token generation
+    - `IUserRepository` - For user CRUD
+    - `IRefreshTokenRepository` - For refresh token CRUD
+    - `ILogger<AuthService>` - For structured logging
+  - **Method**: `Task<LoginResponse?> LoginWithGoogleAsync(string idToken, CancellationToken ct = default)`
+  - **Implementation Flow** (matches all acceptance criteria):
+    1. Validate ID token with Google (AC6) - call `GoogleAuthService.ValidateIdTokenAsync()`
+    2. Return null if invalid
+    3. Query user by provider + externalUserId
+    4. **If new user** (AC7):
+       - Create User using `User.CreateFromGoogle()`
+       - Save to database via repository
+       - Log registration event
+    5. **If existing user** (AC8):
+       - Call `user.RecordLogin()` to update LastLoginAt
+       - Save to database via repository
+       - Log login event
+    6. Generate JWT access token (AC9) - call `JwtTokenGenerator.GenerateAccessToken()`
+    7. Generate refresh token (AC10):
+       - Call `JwtTokenGenerator.GenerateRefreshToken()`
+       - Hash token via `JwtTokenGenerator.HashToken()`
+       - Create RefreshToken entity with 7-day validity
+       - Save to database
+    8. Return LoginResponse (AC11) with all required fields
+  - **Why**: Application service orchestrates domain logic and infrastructure
+  - **Note**: Event publishing (UserRegistered) added in Phase 6
+  - **Reference**: [Feature Spec - Acceptance Criteria](./f0001_sign_in_with_google.md) (AC6-AC11)
 
-  public record LoginResponse(
-      string AccessToken,
-      string RefreshToken,
-      int ExpiresIn,
-      string TokenType,
-      Guid UserId,
-      bool IsNewUser,
-      string Email
-  );
-  ```
+### Create FluentValidation Validator
+- [ ] Create `LoginWithGoogleRequestValidator`
+  - **Namespace**: `DatingApp.IdentityService.Application.Validators`
+  - **Inherits**: `AbstractValidator<LoginWithGoogleRequest>`
+  - **Rules**:
+    - IdToken: NotEmpty() with message "ID token is required"
+  - **Why**: Input validation before processing, fail fast on bad requests
+  - **Reference**: [Architecture Guidelines - Validation Strategy](../../10_architecture/02_architecture-guidelines.md)
 
-### Create Application Service
-**Reference**: [Feature Spec - Acceptance Criteria](./f0001_sign_in_with_google.md#acceptance-criteria)
-
-- [ ] Create `Services/AuthService.cs`
-  ```csharp
-  using DatingApp.IdentityService.Application.DTOs;
-  using DatingApp.IdentityService.Domain.Entities;
-  using DatingApp.IdentityService.Domain.Enums;
-  using DatingApp.IdentityService.Domain.Repositories;
-  using DatingApp.IdentityService.Infrastructure.Services;
-  using Microsoft.Extensions.Logging;
-
-  namespace DatingApp.IdentityService.Application.Services;
-
-  public class AuthService
-  {
-      private readonly IGoogleAuthService _googleAuthService;
-      private readonly IJwtTokenGenerator _jwtTokenGenerator;
-      private readonly IUserRepository _userRepository;
-      private readonly IRefreshTokenRepository _refreshTokenRepository;
-      private readonly ILogger<AuthService> _logger;
-
-      public AuthService(
-          IGoogleAuthService googleAuthService,
-          IJwtTokenGenerator jwtTokenGenerator,
-          IUserRepository userRepository,
-          IRefreshTokenRepository refreshTokenRepository,
-          ILogger<AuthService> logger)
-      {
-          _googleAuthService = googleAuthService;
-          _jwtTokenGenerator = jwtTokenGenerator;
-          _userRepository = userRepository;
-          _refreshTokenRepository = refreshTokenRepository;
-          _logger = logger;
-      }
-
-      public async Task<LoginResponse?> LoginWithGoogleAsync(string idToken, CancellationToken ct = default)
-      {
-          // AC6: Validate ID token with Google API
-          var googleUser = await _googleAuthService.ValidateIdTokenAsync(idToken, ct);
-          if (googleUser == null)
-          {
-              _logger.LogWarning("Invalid Google ID token");
-              return null;
-          }
-
-          // Check if user exists
-          var user = await _userRepository.GetByExternalUserIdAsync(AuthProvider.Google, googleUser.Sub, ct);
-
-          bool isNewUser = user == null;
-
-          if (isNewUser)
-          {
-              // AC7: Create new user
-              user = User.CreateFromGoogle(googleUser.Email, googleUser.Sub);
-              await _userRepository.AddAsync(user, ct);
-
-              _logger.LogInformation("New user registered: {UserId}", user.Id);
-          }
-          else
-          {
-              // AC8: Update last login
-              user.RecordLogin();
-              await _userRepository.UpdateAsync(user, ct);
-
-              _logger.LogInformation("Existing user logged in: {UserId}", user.Id);
-          }
-
-          // AC9: Generate JWT access token
-          var accessToken = _jwtTokenGenerator.GenerateAccessToken(user.Id, user.Email);
-
-          // AC10: Create refresh token
-          var refreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
-          var refreshTokenHash = _jwtTokenGenerator.HashToken(refreshTokenValue);
-
-          var refreshToken = RefreshToken.Create(user.Id, refreshTokenHash, validityDays: 7);
-          await _refreshTokenRepository.AddAsync(refreshToken, ct);
-
-          // AC11: Return response
-          return new LoginResponse(
-              AccessToken: accessToken,
-              RefreshToken: refreshTokenValue,
-              ExpiresIn: 900, // 15 minutes
-              TokenType: "Bearer",
-              UserId: user.Id,
-              IsNewUser: isNewUser,
-              Email: user.Email
-          );
-      }
-  }
-  ```
-
-### Create FluentValidation Validators
-**Reference**: [Architecture Guidelines - Validation](../../10_architecture/02_architecture-guidelines.md#validation)
-
-- [ ] Create `Validators/LoginWithGoogleRequestValidator.cs`
-  ```csharp
-  using FluentValidation;
-  using DatingApp.IdentityService.Application.DTOs;
-
-  namespace DatingApp.IdentityService.Application.Validators;
-
-  public class LoginWithGoogleRequestValidator : AbstractValidator<LoginWithGoogleRequest>
-  {
-      public LoginWithGoogleRequestValidator()
-      {
-          RuleFor(x => x.IdToken)
-              .NotEmpty().WithMessage("ID token is required");
-      }
-  }
-  ```
-
-- [ ] Commit application layer
-  ```bash
-  git add src/Services/Identity/DatingApp.IdentityService.Application/
-  git commit -m "feat(identity): add authentication application service (#issue-number)"
-  ```
+### Commit Application Layer
+- [ ] Commit DTOs, AuthService, validators
+  - Message: `feat(identity): add authentication application service (#issue-number)`
 
 ---
 
 ## Phase 5: API Layer (1 hour)
 
-**Reference**: [Service Templates - API Layer](../../10_architecture/03_service-templates.md#api-layer)
+**Reference**: [Service Templates - API Layer](../../10_architecture/03_service-templates.md)
+**Reference**: [Feature Spec - API Specification](./f0001_sign_in_with_google.md)
 
-### Create Auth Controller
-**Reference**: [Feature Spec - API Specification](./f0001_sign_in_with_google.md#api-specification)
+### Create AuthController
+- [ ] Create `AuthController`
+  - **Namespace**: `DatingApp.IdentityService.Api.Controllers`
+  - **Attributes**: `[ApiController]`, `[Route("api/v1/auth")]`
+  - **Constructor**: Inject `AuthService`, `ILogger<AuthController>`
+  - **Endpoint**: `POST /api/v1/auth/login/google`
+    - Attribute: `[HttpPost("login/google")]`
+    - Parameter: `[FromBody] LoginWithGoogleRequest request`
+    - Return types:
+      - 200 OK: `LoginResponse`
+      - 400 Bad Request: `ProblemDetails` (invalid token)
+      - 429 Too Many Requests: `ProblemDetails` (rate limit)
+      - 500 Internal Server Error: `ProblemDetails` (server error)
+    - Implementation:
+      - Call `AuthService.LoginWithGoogleAsync()`
+      - Return 200 OK with response if successful
+      - Return 400 BadRequest with RFC 7807 Problem Details if validation fails
+    - **Why**: HTTP endpoint exposes authentication functionality
+    - **Reference**: [Feature Spec - API Specification](./f0001_sign_in_with_google.md) (lines 126-189)
 
-- [ ] Create `Controllers/AuthController.cs`
-  ```csharp
-  using Microsoft.AspNetCore.Mvc;
-  using DatingApp.IdentityService.Application.DTOs;
-  using DatingApp.IdentityService.Application.Services;
+### Configure Program.cs (Dependency Injection)
+- [ ] Register services in DI container:
+  - **DbContext**: `AddDbContext<IdentityDbContext>()` with connection string from configuration
+  - **Repositories** (scoped):
+    - `IUserRepository` → `UserRepository`
+    - `IRefreshTokenRepository` → `RefreshTokenRepository`
+  - **Infrastructure Services** (scoped):
+    - `IGoogleAuthService` → `GoogleAuthService`
+    - `IJwtTokenGenerator` → `JwtTokenGenerator`
+  - **Application Services** (scoped):
+    - `AuthService`
+  - **Validators**: `AddValidatorsFromAssemblyContaining<LoginWithGoogleRequestValidator>()`
+  - **Why**: DI enables loose coupling, testability
+  - **Reference**: [Architecture Guidelines - DI Registration](../../10_architecture/02_architecture-guidelines.md)
 
-  namespace DatingApp.IdentityService.Api.Controllers;
+### Configure JWT Authentication
+- [ ] Add JWT Bearer authentication middleware
+  - Use `AddAuthentication(JwtBearerDefaults.AuthenticationScheme)`
+  - Configure `TokenValidationParameters`:
+    - ValidateIssuer: true
+    - ValidateAudience: true
+    - ValidateLifetime: true
+    - ValidateIssuerSigningKey: true
+    - ValidIssuer: from appsettings Jwt:Issuer
+    - ValidAudience: from appsettings Jwt:Audience
+    - IssuerSigningKey: from appsettings Jwt:SecretKey (convert to SymmetricSecurityKey)
+  - Add middleware: `app.UseAuthentication()`
+  - **Why**: Validates JWT tokens on protected endpoints
+  - **Reference**: [Security & Auth - JWT Middleware](../../10_architecture/05_security-and-auth.md)
 
-  [ApiController]
-  [Route("api/v1/auth")]
-  public class AuthController : ControllerBase
-  {
-      private readonly AuthService _authService;
-      private readonly ILogger<AuthController> _logger;
+### Configure Rate Limiting
+- [ ] Add rate limiting with AspNetCoreRateLimit
+  - Configure `IpRateLimitOptions` from appsettings IpRateLimiting section
+  - Add memory cache: `AddMemoryCache()`
+  - Add rate limiting services: `AddInMemoryRateLimiting()`
+  - Add middleware: `app.UseIpRateLimiting()`
+  - **Configuration**: 5 requests per IP per minute for /api/v1/auth/login/* endpoints
+  - **Why**: Prevents brute force attacks, DoS protection
+  - **Reference**: [Feature Spec - NF3](./f0001_sign_in_with_google.md) (Rate limiting requirement)
 
-      public AuthController(AuthService authService, ILogger<AuthController> logger)
-      {
-          _authService = authService;
-          _logger = logger;
-      }
+### Configure Serilog Logging
+- [ ] Configure Serilog in Program.cs
+  - Use `UseSerilog()` host builder extension
+  - Read configuration from appsettings Serilog section
+  - **Sinks**: Console (for development), Seq (for structured logs at http://localhost:5341)
+  - Add request logging middleware: `app.UseSerilogRequestLogging()`
+  - **Why**: Structured logging enables debugging, correlation IDs for tracing
+  - **Reference**: [Architecture Guidelines - Logging Strategy](../../10_architecture/02_architecture-guidelines.md)
 
-      /// <summary>
-      /// Sign in with Google OAuth
-      /// </summary>
-      [HttpPost("login/google")]
-      [ProducesResponseType(typeof(LoginResponse), 200)]
-      [ProducesResponseType(typeof(ProblemDetails), 400)]
-      [ProducesResponseType(typeof(ProblemDetails), 429)]
-      [ProducesResponseType(typeof(ProblemDetails), 500)]
-      public async Task<IActionResult> LoginWithGoogle([FromBody] LoginWithGoogleRequest request, CancellationToken ct)
-      {
-          var result = await _authService.LoginWithGoogleAsync(request.IdToken, ct);
+### Configure Swagger/OpenAPI
+- [ ] Add Swagger services: `AddSwaggerGen()`
+- [ ] Add Swagger middleware (development only)
+- [ ] **Why**: API documentation, interactive testing
 
-          if (result == null)
-          {
-              return BadRequest(new ProblemDetails
-              {
-                  Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
-                  Title = "Invalid ID Token",
-                  Status = 400,
-                  Detail = "The provided ID token is invalid or expired."
-              });
-          }
+### Create appsettings.Development.json
+- [ ] Add configuration sections:
+  - **ConnectionStrings**:
+    - IdentityDb: "Host=localhost;Database=identity_db;Username=admin;Password=QuietMatch_Dev_2025!"
+  - **Google**:
+    - ClientId: "your-client-id.apps.googleusercontent.com"
+    - ClientSecret: "your-client-secret"
+  - **Jwt**:
+    - SecretKey: "your-256-bit-secret-key-for-development-only"
+    - Issuer: "https://localhost:5001"
+    - Audience: "https://localhost:5001"
+    - AccessTokenExpiryMinutes: "15"
+  - **IpRateLimiting**:
+    - General rules: 5 requests per minute for /api/v1/auth/login/*
+  - **Serilog**:
+    - MinimumLevel: Debug
+    - WriteTo: Console, Seq (serverUrl: http://localhost:5341)
+  - **Reference**: [Feature Spec - Configuration](./f0001_sign_in_with_google.md) (lines 306-327)
 
-          return Ok(result);
-      }
-  }
-  ```
-
-### Configure Dependency Injection
-**Reference**: [Architecture Guidelines - DI Registration](../../10_architecture/02_architecture-guidelines.md#dependency-injection)
-
-- [ ] Update `Program.cs` with service registrations
-  ```csharp
-  using DatingApp.IdentityService.Infrastructure.Data;
-  using DatingApp.IdentityService.Infrastructure.Services;
-  using DatingApp.IdentityService.Infrastructure.Repositories;
-  using DatingApp.IdentityService.Domain.Repositories;
-  using DatingApp.IdentityService.Application.Services;
-  using Microsoft.EntityFrameworkCore;
-  using Microsoft.AspNetCore.Authentication.JwtBearer;
-  using Microsoft.IdentityModel.Tokens;
-  using System.Text;
-  using Serilog;
-  using FluentValidation;
-  using AspNetCoreRateLimit;
-
-  var builder = WebApplication.CreateBuilder(args);
-
-  // Serilog
-  builder.Host.UseSerilog((context, config) =>
-  {
-      config.ReadFrom.Configuration(context.Configuration);
-  });
-
-  // Database
-  builder.Services.AddDbContext<IdentityDbContext>(options =>
-      options.UseNpgsql(builder.Configuration.GetConnectionString("IdentityDb")));
-
-  // Repositories
-  builder.Services.AddScoped<IUserRepository, UserRepository>();
-  builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-
-  // Services
-  builder.Services.AddScoped<IGoogleAuthService, GoogleAuthService>();
-  builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-  builder.Services.AddScoped<AuthService>();
-
-  // Validators
-  builder.Services.AddValidatorsFromAssemblyContaining<LoginWithGoogleRequestValidator>();
-
-  // Rate Limiting
-  builder.Services.AddMemoryCache();
-  builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
-  builder.Services.AddInMemoryRateLimiting();
-  builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
-
-  // JWT Authentication
-  builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-      .AddJwtBearer(options =>
-      {
-          options.TokenValidationParameters = new TokenValidationParameters
-          {
-              ValidateIssuer = true,
-              ValidateAudience = true,
-              ValidateLifetime = true,
-              ValidateIssuerSigningKey = true,
-              ValidIssuer = builder.Configuration["Jwt:Issuer"],
-              ValidAudience = builder.Configuration["Jwt:Audience"],
-              IssuerSigningKey = new SymmetricSecurityKey(
-                  Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]!))
-          };
-      });
-
-  builder.Services.AddControllers();
-  builder.Services.AddEndpointsApiExplorer();
-  builder.Services.AddSwaggerGen();
-
-  var app = builder.Build();
-
-  if (app.Environment.IsDevelopment())
-  {
-      app.UseSwagger();
-      app.UseSwaggerUI();
-  }
-
-  app.UseSerilogRequestLogging();
-  app.UseIpRateLimiting();
-  app.UseAuthentication();
-  app.UseAuthorization();
-  app.MapControllers();
-
-  app.Run();
-  ```
-
-### Configure appsettings.json
-**Reference**: [Feature Spec - Configuration](./f0001_sign_in_with_google.md#configuration)
-
-- [ ] Update `appsettings.Development.json`
-  ```json
-  {
-    "ConnectionStrings": {
-      "IdentityDb": "Host=localhost;Database=identity_db;Username=admin;Password=QuietMatch_Dev_2025!"
-    },
-    "Google": {
-      "ClientId": "your-client-id.apps.googleusercontent.com",
-      "ClientSecret": "your-client-secret"
-    },
-    "Jwt": {
-      "SecretKey": "your-256-bit-secret-key-for-development-only",
-      "Issuer": "https://localhost:5001",
-      "Audience": "https://localhost:5001",
-      "AccessTokenExpiryMinutes": "15"
-    },
-    "IpRateLimiting": {
-      "EnableEndpointRateLimiting": true,
-      "StackBlockedRequests": false,
-      "RealIpHeader": "X-Real-IP",
-      "ClientIdHeader": "X-ClientId",
-      "HttpStatusCode": 429,
-      "GeneralRules": [
-        {
-          "Endpoint": "*/api/v1/auth/login/*",
-          "Period": "1m",
-          "Limit": 5
-        }
-      ]
-    },
-    "Serilog": {
-      "Using": [ "Serilog.Sinks.Console", "Serilog.Sinks.Seq" ],
-      "MinimumLevel": "Debug",
-      "WriteTo": [
-        { "Name": "Console" },
-        {
-          "Name": "Seq",
-          "Args": { "serverUrl": "http://localhost:5341" }
-        }
-      ]
-    }
-  }
-  ```
-
-- [ ] Commit API layer
-  ```bash
-  git add src/Services/Identity/DatingApp.IdentityService.Api/
-  git commit -m "feat(identity): add auth controller and DI configuration (#issue-number)"
-  ```
+### Commit API Layer
+- [ ] Commit controller, Program.cs, appsettings
+  - Message: `feat(identity): add auth controller and API configuration (#issue-number)`
 
 ---
 
-## Phase 6: Messaging Integration (1 hour)
+## Phase 6: Messaging Integration (45 minutes - 1 hour)
 
-**Reference**: [Messaging & Integration - MassTransit Setup](../../10_architecture/06_messaging-and-integration.md)
+**Reference**: [Messaging & Integration - MassTransit](../../10_architecture/06_messaging-and-integration.md)
+**Reference**: [Feature Spec - Events Published](./f0001_sign_in_with_google.md)
 
-### Create Integration Event
-**Reference**: [Feature Spec - Events Published](./f0001_sign_in_with_google.md#events-published)
-
-- [ ] Create `Events/UserRegistered.cs` in Infrastructure
-  ```csharp
-  namespace DatingApp.IdentityService.Infrastructure.Events;
-
-  public record UserRegistered
-  {
-      public Guid UserId { get; init; }
-      public string Email { get; init; }
-      public string Provider { get; init; }
-      public DateTime RegisteredAt { get; init; }
-      public Guid CorrelationId { get; init; }
-  }
-  ```
+### Create UserRegistered Event
+- [ ] Create `UserRegistered` record (integration event)
+  - **Namespace**: `DatingApp.IdentityService.Infrastructure.Events` (or BuildingBlocks.Events if shared)
+  - **Properties**:
+    - `Guid UserId` - User identifier
+    - `string Email` - User email
+    - `string Provider` - "Google" or "Apple"
+    - `DateTime RegisteredAt` - Registration timestamp
+    - `Guid CorrelationId` - For distributed tracing
+  - **Why**: Integration event notifies other services of new user registration
+  - **Naming**: Past tense (event = fact that happened)
+  - **Reference**: [Feature Spec - Events Published](./f0001_sign_in_with_google.md) (lines 280-298)
+  - **Reference**: [Messaging Guidelines - Event Design](../../10_architecture/06_messaging-and-integration.md)
 
 ### Configure MassTransit
-**Reference**: [Messaging & Integration - MassTransit Configuration](../../10_architecture/06_messaging-and-integration.md#masstransit-implementation)
-
-- [ ] Update `Program.cs` with MassTransit
-  ```csharp
-  using MassTransit;
-
-  // Add after other service registrations
-  builder.Services.AddMassTransit(config =>
-  {
-      if (builder.Environment.IsDevelopment())
-      {
-          // RabbitMQ (local)
-          config.UsingRabbitMq((context, cfg) =>
-          {
-              cfg.Host("rabbitmq", "/", h =>
-              {
-                  h.Username("guest");
-                  h.Password("guest");
-              });
-
-              cfg.ConfigureEndpoints(context);
-          });
-      }
-      else
-      {
-          // Azure Service Bus (production)
-          config.UsingAzureServiceBus((context, cfg) =>
-          {
-              cfg.Host(builder.Configuration["AzureServiceBus:ConnectionString"]);
-              cfg.ConfigureEndpoints(context);
-          });
-      }
-  });
-  ```
+- [ ] Add MassTransit to Program.cs:
+  - Register with `AddMassTransit()`
+  - **For Development** (local):
+    - Use `UsingRabbitMq()` transport
+    - Host: "rabbitmq" (Docker service name)
+    - Credentials: guest/guest
+  - **For Production** (Azure):
+    - Use `UsingAzureServiceBus()` transport
+    - Connection string from configuration
+  - Use environment check: `builder.Environment.IsDevelopment()` to switch transports
+  - **Why**: Abstraction enables local dev with RabbitMQ, production with Azure Service Bus
+  - **Reference**: [Messaging Guidelines - MassTransit Setup](../../10_architecture/06_messaging-and-integration.md) (lines 272-304)
 
 ### Update AuthService to Publish Event
-**Reference**: [Feature Spec - Acceptance Criteria AC7](./f0001_sign_in_with_google.md#acceptance-criteria)
+- [ ] Modify AuthService constructor to inject `IPublishEndpoint` (from MassTransit)
+- [ ] In LoginWithGoogleAsync method, after creating new user:
+  - Publish `UserRegistered` event using `_publishEndpoint.Publish()`
+  - Include all required event properties
+  - Use `Guid.NewGuid()` for CorrelationId
+  - **Only publish for NEW users** (not existing users)
+  - **Why**: ProfileService subscribes to this event to create empty profile
+  - **Reference**: [Feature Spec - AC7](./f0001_sign_in_with_google.md) (UserRegistered event requirement)
 
-- [ ] Update `AuthService.cs` to publish UserRegistered event
-  ```csharp
-  // Add constructor parameter
-  private readonly IPublishEndpoint _publishEndpoint;
-
-  // In LoginWithGoogleAsync, after creating new user:
-  if (isNewUser)
-  {
-      user = User.CreateFromGoogle(googleUser.Email, googleUser.Sub);
-      await _userRepository.AddAsync(user, ct);
-
-      // Publish UserRegistered event
-      await _publishEndpoint.Publish(new UserRegistered
-      {
-          UserId = user.Id,
-          Email = user.Email,
-          Provider = "Google",
-          RegisteredAt = user.CreatedAt,
-          CorrelationId = Guid.NewGuid()
-      }, ct);
-
-      _logger.LogInformation("New user registered and event published: {UserId}", user.Id);
-  }
-  ```
-
-- [ ] Commit messaging integration
-  ```bash
-  git add src/Services/Identity/
-  git commit -m "feat(identity): add MassTransit and UserRegistered event (#issue-number)"
-  ```
+### Commit Messaging Integration
+- [ ] Commit event definition, MassTransit configuration, AuthService update
+  - Message: `feat(identity): add UserRegistered event publishing with MassTransit (#issue-number)`
 
 ---
 
-## Phase 7: Testing (2 hours)
+## Phase 7: Testing (2-2.5 hours)
 
-**Reference**: [Feature Spec - Testing Strategy](./f0001_sign_in_with_google.md#testing-strategy)
+**Reference**: [Feature Spec - Testing Requirements](./f0001_sign_in_with_google.md)
+**Reference**: [Architecture Guidelines - Testing Strategy](../../10_architecture/02_architecture-guidelines.md)
 
-### Unit Tests
+### Unit Tests - Domain Layer
+- [ ] Create test class: `UserTests.cs`
+  - Test: `CreateFromGoogle_ShouldSetPropertiesCorrectly()` - verify Id, Email, Provider, ExternalUserId, CreatedAt set
+  - Test: `RecordLogin_ShouldUpdateLastLoginAt()` - verify timestamp updated
+  - **Why**: Domain logic must be tested in isolation
 
-- [ ] Create `Unit/Application/AuthServiceTests.cs`
-  - Test: LoginWithGoogle_WhenTokenValid_ShouldReturnAccessToken
-  - Test: LoginWithGoogle_WhenTokenInvalid_ShouldThrowException
-  - Test: LoginWithGoogle_WhenNewUser_ShouldCreateUser
-  - Test: LoginWithGoogle_WhenExistingUser_ShouldUpdateLastLogin
-  - **Reference**: [Feature Spec - Unit Tests](./f0001_sign_in_with_google.md#unit-tests) (lines 334-368)
+- [ ] Create test class: `RefreshTokenTests.cs`
+  - Test: `Create_ShouldSetExpiryCorrectly()` - verify ExpiresAt = CreatedAt + validityDays
+  - Test: `Revoke_ShouldMarkAsRevoked()` - verify IsRevoked=true, RevokedAt set
+  - Test: `IsValid_WhenExpired_ShouldReturnFalse()` - test expiry check
+  - Test: `IsValid_WhenRevoked_ShouldReturnFalse()` - test revocation check
+  - **Why**: Token lifecycle critical for security
 
-- [ ] Create `Unit/Domain/UserTests.cs`
-  - Test: CreateFromGoogle_ShouldSetProperties
-  - Test: RecordLogin_ShouldUpdateLastLoginAt
+### Unit Tests - Application Layer
+- [ ] Create test class: `AuthServiceTests.cs`
+  - **Setup**: Use Moq to mock all dependencies (IGoogleAuthService, IJwtTokenGenerator, repositories)
+  - Test: `LoginWithGoogle_ValidToken_NewUser_ShouldCreateUser()` - verify user created, event published
+  - Test: `LoginWithGoogle_ValidToken_ExistingUser_ShouldUpdateLastLogin()` - verify LastLoginAt updated
+  - Test: `LoginWithGoogle_InvalidToken_ShouldReturnNull()` - verify null return on invalid token
+  - Test: `LoginWithGoogle_NewUser_ShouldPublishUserRegisteredEvent()` - verify event published
+  - Test: `LoginWithGoogle_ShouldGenerateJwtWithCorrectClaims()` - verify JWT structure
+  - Test: `LoginWithGoogle_ShouldHashRefreshToken()` - verify token not stored in plain text
+  - **Why**: Application logic orchestration must be tested
+  - **Use**: FluentAssertions for readable assertions
 
-- [ ] Create `Unit/Domain/RefreshTokenTests.cs`
-  - Test: Create_ShouldSetExpiryDate
-  - Test: Revoke_ShouldMarkAsRevoked
-  - Test: IsValid_WhenNotExpired_ShouldReturnTrue
-  - Test: IsValid_WhenExpired_ShouldReturnFalse
+### Unit Tests - Infrastructure Layer
+- [ ] Create test class: `GoogleAuthServiceTests.cs`
+  - Test: `ValidateIdToken_ValidToken_ShouldReturnUserInfo()` - mock Google API response
+  - Test: `ValidateIdToken_InvalidToken_ShouldReturnNull()` - test error handling
+  - **Why**: External service integration needs testing
 
-- [ ] Run unit tests
-  ```bash
-  cd src/Services/Identity/DatingApp.IdentityService.Tests.Unit
-  dotnet test
-  ```
+- [ ] Create test class: `JwtTokenGeneratorTests.cs`
+  - Test: `GenerateAccessToken_ShouldCreateValidJwt()` - verify token can be parsed, claims correct
+  - Test: `HashToken_ShouldProduceConsistentHash()` - verify same input = same hash
+  - **Why**: Token generation correctness critical for security
 
-### Integration Tests
+### Integration Tests - API Layer
+- [ ] Create test class: `AuthControllerTests.cs`
+  - **Setup**: Use `WebApplicationFactory<Program>` for in-memory API
+  - **Setup**: Use Testcontainers for real PostgreSQL and RabbitMQ
+  - Test: `POST_LoginGoogle_NewUser_ShouldReturn200WithIsNewUserTrue()` - verify full flow
+  - Test: `POST_LoginGoogle_ExistingUser_ShouldReturn200WithIsNewUserFalse()` - verify existing user flow
+  - Test: `POST_LoginGoogle_InvalidToken_ShouldReturn400()` - verify error response
+  - Test: `POST_LoginGoogle_RateLimitExceeded_ShouldReturn429()` - verify rate limiting (call 6 times rapidly)
+  - **Database Verification**: Query database after API call to verify user/token persisted
+  - **Event Verification**: Check RabbitMQ for published UserRegistered event
+  - **Why**: End-to-end testing ensures all layers work together
+  - **Reference**: [Feature Spec - Integration Testing Requirements](./f0001_sign_in_with_google.md)
 
-- [ ] Create `Integration/AuthControllerTests.cs`
-  - Test: GoogleLogin_WhenNewUser_ShouldCreateUserAndReturnTokens
-  - Test: GoogleLogin_WhenExistingUser_ShouldReturnTokens
-  - Test: GoogleLogin_WhenInvalidToken_ShouldReturn400
-  - Test: GoogleLogin_WhenRateLimitExceeded_ShouldReturn429
-  - **Reference**: [Feature Spec - Integration Tests](./f0001_sign_in_with_google.md#integration-tests) (lines 373-397)
+### Run All Tests
+- [ ] Execute: `dotnet test` from solution root
+- [ ] Verify all tests pass
+- [ ] Check code coverage (target: >80% for business logic)
 
-- [ ] Set up Testcontainers for PostgreSQL
-  ```csharp
-  using Testcontainers.PostgreSql;
-
-  public class IntegrationTestBase : IAsyncLifetime
-  {
-      private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder()
-          .WithImage("postgres:16-alpine")
-          .Build();
-
-      public async Task InitializeAsync()
-      {
-          await _dbContainer.StartAsync();
-      }
-
-      public async Task DisposeAsync()
-      {
-          await _dbContainer.DisposeAsync();
-      }
-  }
-  ```
-
-- [ ] Run integration tests
-  ```bash
-  cd src/Services/Identity/DatingApp.IdentityService.Tests.Integration
-  dotnet test
-  ```
-
-- [ ] Commit tests
-  ```bash
-  git add src/Services/Identity/*.Tests.*
-  git commit -m "test(identity): add unit and integration tests for F0001 (#issue-number)"
-  ```
+### Commit Tests
+- [ ] Commit all test files
+  - Message: `test(identity): add comprehensive unit and integration tests for F0001 (#issue-number)`
 
 ---
 
-## Phase 8: Docker Integration (30 minutes)
+## Phase 8: Docker Integration (30-45 minutes)
 
-**Reference**: [Architecture Guidelines - Docker](../../10_architecture/02_architecture-guidelines.md#docker)
+**Reference**: [Architecture Guidelines - Docker Configuration](../../10_architecture/02_architecture-guidelines.md)
 
 ### Create Dockerfile
-
 - [ ] Create `src/Services/Identity/Dockerfile`
-  ```dockerfile
-  FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-  WORKDIR /app
-  EXPOSE 80
-  EXPOSE 443
-
-  FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-  WORKDIR /src
-  COPY ["DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj", "DatingApp.IdentityService.Api/"]
-  COPY ["DatingApp.IdentityService.Application/DatingApp.IdentityService.Application.csproj", "DatingApp.IdentityService.Application/"]
-  COPY ["DatingApp.IdentityService.Domain/DatingApp.IdentityService.Domain.csproj", "DatingApp.IdentityService.Domain/"]
-  COPY ["DatingApp.IdentityService.Infrastructure/DatingApp.IdentityService.Infrastructure.csproj", "DatingApp.IdentityService.Infrastructure/"]
-  RUN dotnet restore "DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj"
-
-  COPY . .
-  WORKDIR "/src/DatingApp.IdentityService.Api"
-  RUN dotnet build "DatingApp.IdentityService.Api.csproj" -c Release -o /app/build
-
-  FROM build AS publish
-  RUN dotnet publish "DatingApp.IdentityService.Api.csproj" -c Release -o /app/publish
-
-  FROM base AS final
-  WORKDIR /app
-  COPY --from=publish /app/publish .
-  ENTRYPOINT ["dotnet", "DatingApp.IdentityService.Api.dll"]
-  ```
+  - **Multi-stage build**:
+    - Stage 1 (base): `mcr.microsoft.com/dotnet/aspnet:8.0` - runtime
+    - Stage 2 (build): `mcr.microsoft.com/dotnet/sdk:8.0` - build + restore
+    - Stage 3 (publish): Build Release configuration
+    - Stage 4 (final): Copy published output, set entrypoint
+  - **Why**: Multi-stage build keeps final image small (only runtime + app)
 
 ### Update docker-compose.yml
+- [ ] Add IdentityService configuration:
+  - Service name: `identity-service`
+  - Build context: `./src/Services/Identity`
+  - Ports: Map 5001:80
+  - Environment variables:
+    - ConnectionStrings__IdentityDb: PostgreSQL connection string (use Docker service name "postgres")
+    - Google__ClientId: ${GOOGLE_CLIENT_ID} (from .env file)
+    - Google__ClientSecret: ${GOOGLE_CLIENT_SECRET}
+    - Jwt__SecretKey: ${JWT_SECRET_KEY}
+    - Jwt__Issuer, Jwt__Audience
+  - Depends on: postgres, rabbitmq
+  - **Why**: Enables local development with all dependencies
 
-- [ ] Uncomment IdentityService in `docker-compose.yml`
-  ```yaml
-  identity-service:
-    build:
-      context: ./src/Services/Identity
-      dockerfile: Dockerfile
-    ports:
-      - "5001:80"
-    environment:
-      - ConnectionStrings__IdentityDb=Host=postgres;Database=identity_db;Username=admin;Password=QuietMatch_Dev_2025!
-      - Google__ClientId=${GOOGLE_CLIENT_ID}
-      - Google__ClientSecret=${GOOGLE_CLIENT_SECRET}
-      - Jwt__SecretKey=${JWT_SECRET_KEY}
-      - Jwt__Issuer=https://quietmatch.com
-      - Jwt__Audience=https://api.quietmatch.com
-    depends_on:
-      - postgres
-      - rabbitmq
-  ```
+### Test Docker Build and Run
+- [ ] Build Docker image: `docker-compose build identity-service`
+- [ ] Run service: `docker-compose up identity-service`
+- [ ] Verify service starts without errors in logs
+- [ ] Test health check: `curl http://localhost:5001/health` (if health endpoint added)
+- [ ] Test Swagger: http://localhost:5001/swagger
 
-- [ ] Test Docker build
-  ```bash
-  docker-compose build identity-service
-  ```
-
-- [ ] Test Docker run
-  ```bash
-  docker-compose up identity-service
-  ```
-
-- [ ] Verify service health
-  ```bash
-  curl http://localhost:5001/api/v1/auth/login/google
-  ```
-
-- [ ] Commit Docker integration
-  ```bash
-  git add docker-compose.yml src/Services/Identity/Dockerfile
-  git commit -m "feat(identity): add Docker support for F0001 (#issue-number)"
-  ```
+### Commit Docker Integration
+- [ ] Commit Dockerfile and docker-compose.yml changes
+  - Message: `feat(identity): add Docker support for F0001 (#issue-number)`
 
 ---
 
-## Phase 9: Manual Testing & Verification (30 minutes)
+## Phase 9: Manual Testing & Verification (30-45 minutes)
 
-**Reference**: [Feature Spec - Manual Testing Checklist](./f0001_sign_in_with_google.md#manual-testing-checklist)
+**Reference**: [Feature Spec - Manual Testing Checklist](./f0001_sign_in_with_google.md)
 
 ### Manual Testing Checklist
+- [ ] **Happy Path - New User**:
+  - Use Postman/Insomnia to POST to http://localhost:5001/api/v1/auth/login/google
+  - Include valid Google ID token in request body
+  - Verify 200 OK response with isNewUser=true
+  - Verify accessToken and refreshToken returned
+  - Check database: User record created in `users` table
+  - Check database: RefreshToken record created in `refresh_tokens` table with hashed token
+  - Check RabbitMQ UI (http://localhost:15672): UserRegistered message in queue
+  - Check Seq logs (http://localhost:5341): Login event logged
 
-- [ ] Sign in with new Google account works
-- [ ] Sign in with existing Google account works
-- [ ] Invalid ID token returns 400 error
-- [ ] Expired ID token returns 400 error
-- [ ] Rate limiting blocks after 5 attempts
-- [ ] UserRegistered event published for new users (check RabbitMQ UI: http://localhost:15672)
-- [ ] Tokens stored correctly (verify in database)
-- [ ] Logs appear in Seq (http://localhost:5341)
-- [ ] Swagger UI accessible (http://localhost:5001/swagger)
+- [ ] **Happy Path - Existing User**:
+  - Use same Google account to login again
+  - Verify 200 OK response with isNewUser=false
+  - Check database: LastLoginAt updated for user
 
-### Postman/cURL Testing
+- [ ] **Error Scenario - Invalid Token**:
+  - POST with invalid/malformed ID token
+  - Verify 400 Bad Request with Problem Details response
 
-- [ ] Test valid Google login
-  ```bash
-  curl -X POST http://localhost:5001/api/v1/auth/login/google \
-    -H "Content-Type: application/json" \
-    -d '{"idToken": "your-valid-google-id-token"}'
-  ```
+- [ ] **Error Scenario - Rate Limiting**:
+  - POST 6 times rapidly from same IP
+  - Verify 6th request returns 429 Too Many Requests
 
-- [ ] Test invalid token
-  ```bash
-  curl -X POST http://localhost:5001/api/v1/auth/login/google \
-    -H "Content-Type: application/json" \
-    -d '{"idToken": "invalid-token"}'
-  ```
+- [ ] **Token Validation**:
+  - Copy accessToken from response
+  - Use jwt.io to decode token
+  - Verify claims: sub (userId), email, jti, iat, exp
+  - Verify exp is ~15 minutes from iat
 
-- [ ] Test rate limiting (run 6 times quickly)
-  ```bash
-  for i in {1..6}; do curl -X POST http://localhost:5001/api/v1/auth/login/google; done
-  ```
+- [ ] **Logs Verification**:
+  - Check Seq (http://localhost:5341) for structured logs
+  - Search for correlation IDs
+  - Verify no errors/warnings during happy path
 
 ---
 
 ## Completion Checklist
 
-**Reference**: [Feature Workflow - Completion Checklist](../../60_operations/feature-workflow.md#completion-checklist)
-
 ### Code Quality
-- [ ] Follows Layered architecture pattern
-- [ ] Uses ubiquitous language from domain model
-- [ ] No hardcoded values (all in configuration)
+- [ ] Follows Layered architecture pattern (Domain → Application → Infrastructure → API)
+- [ ] Uses ubiquitous language from domain model (User, RefreshToken, AuthProvider)
+- [ ] No hardcoded values (all configuration externalized to appsettings)
 - [ ] No commented-out code
-- [ ] Meaningful variable/method names
-- [ ] Comments explain "why", not "what"
+- [ ] Meaningful variable and method names
+- [ ] Comments explain "why" (architecture decisions), not "what"
+- [ ] All async methods use CancellationToken
 
 ### Testing
-- [ ] Unit tests written (80%+ coverage for business logic)
-- [ ] Integration tests written (database, messaging)
-- [ ] API tests written (endpoints)
+- [ ] Unit tests written for domain entities (User, RefreshToken)
+- [ ] Unit tests written for application services (AuthService)
+- [ ] Unit tests written for infrastructure services (GoogleAuthService, JwtTokenGenerator)
+- [ ] Integration tests written for API endpoints
+- [ ] Integration tests written for database operations
+- [ ] Integration tests written for messaging
 - [ ] All tests passing
-- [ ] Manual testing complete
+- [ ] Code coverage >80% for business logic
+- [ ] Manual testing checklist complete
 
 ### Security
-- [ ] JWT authentication configured
-- [ ] Input validation (FluentValidation)
-- [ ] No SQL injection vulnerabilities (EF Core)
-- [ ] Refresh token hashed (SHA-256)
-- [ ] HTTPS required for production
+- [ ] JWT authentication configured and working
+- [ ] Refresh tokens hashed before storage (SHA-256)
+- [ ] Google ID token validated server-side (audience, issuer, expiry)
+- [ ] Rate limiting configured (5 requests/minute per IP)
+- [ ] Input validation with FluentValidation
+- [ ] No SQL injection vulnerabilities (using EF Core parameterized queries)
+- [ ] Sensitive data encrypted/hashed appropriately
+- [ ] HTTPS enforced (production)
 
 ### Documentation
-- [ ] Feature file remains unmodified (immutable input)
-- [ ] Plan.md updated with all progress
-- [ ] PATTERNS.md created for IdentityService
-- [ ] API documentation via Swagger
-- [ ] README.md updated (if needed)
+- [ ] Feature file remains unmodified (immutable specification)
+- [ ] Plan.md updated with all progress and notes
+- [ ] PATTERNS.md created for IdentityService explaining Layered architecture
+- [ ] API documentation available via Swagger
+- [ ] README.md updated with setup instructions (if needed)
+- [ ] .env.example updated with required environment variables
 
-### Final Steps
-- [ ] All commits reference issue number
-- [ ] All tests passing locally
-- [ ] Docker build successful
-- [ ] Service runs in docker-compose
+### Deployment
+- [ ] Dockerfile created and builds successfully
+- [ ] docker-compose.yml updated with IdentityService configuration
+- [ ] Service runs in Docker container
+- [ ] All dependencies (PostgreSQL, RabbitMQ, Redis) accessible from container
+- [ ] Environment variables configured correctly
+
+### GitHub
+- [ ] All commits reference issue number (#issue-number)
+- [ ] Commit messages follow conventional commits format
+- [ ] Feature branch up to date with main
+- [ ] No merge conflicts
 - [ ] Ready to create PR
+
+### Final Verification
+- [ ] All acceptance criteria from feature spec met (AC1-AC14)
+- [ ] All non-functional requirements met (NF1-NF5)
+- [ ] All security requirements met (SEC1-SEC7)
+- [ ] Feature file status updated to "Complete"
+- [ ] Plan.md status updated to "Complete"
+- [ ] Total implementation time recorded
+- [ ] Lessons learned documented in Notes section below
 
 ---
 
 ## Blockers / Questions
 
-*Document any blockers or questions that require human approval here*
+*Document any issues requiring human approval here*
+
+**Template**:
+```
+### [Date] - Blocker Title
+**Issue**: Describe the blocker
+**Impact**: What is blocked?
+**Proposed Solution**: Your recommendation
+**Status**: Awaiting human approval / Resolved
+```
 
 ---
 
 ## Notes & Decisions
 
-*Document implementation decisions and discoveries here*
+*Document implementation discoveries, decisions, and lessons learned here*
+
+**Template**:
+```
+### [Date] - Decision/Discovery Title
+**Context**: What was the situation?
+**Decision**: What did you decide?
+**Rationale**: Why this approach?
+**Alternatives Considered**: What else was considered?
+**Outcome**: How did it work out?
+```
 
 ---
 
 **Completion Status**: 🔴 Not Started
-**Total Implementation Time**: TBD
-**Lessons Learned**: TBD
+**Started**: TBD
+**Completed**: TBD
+**Total Implementation Time**: TBD hours
