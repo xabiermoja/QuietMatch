@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DatingApp.IdentityService.Domain\DatingApp.IdentityService.Domain.csproj" />
+    <ProjectReference Include="..\DatingApp.IdentityService.Infrastructure\DatingApp.IdentityService.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
