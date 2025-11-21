@@ -2,9 +2,24 @@
 
 **Status**: 🔴 Not Started
 **Priority**: P0 (Critical - MVP blocker)
+**GitHub Issue**: TBD
+**Implementation Plan**: [plan.md](./plan.md)
 **Assignee**: TBD
 **Sprint**: Phase 1 - Foundation
 **Estimated Effort**: 8 hours
+
+---
+
+## 🔒 Important
+
+This is the **feature specification** - an **IMMUTABLE INPUT** document. It defines WHAT to build, not HOW.
+
+- ✅ Use this as the authoritative requirements document
+- ✅ Reference this during implementation
+- ❌ **DO NOT modify this file during implementation**
+- 🛑 If requirements change, **STOP and request human approval**
+
+For implementation details and progress tracking, see: **[plan.md](./plan.md)**
 
 ---
 

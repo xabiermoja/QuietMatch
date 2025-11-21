@@ -67,14 +67,21 @@
 - [x] **docs/50_references/glossary.md** - Quick term lookup
 
 ### Feature Documentation (Template)
-- [x] **docs/40_features/f0001_sign_in_with_google.md** - Complete feature example
-  - Acceptance criteria (functional, non-functional, security)
-  - User stories with Gherkin scenarios
-  - API specification
-  - Sequence diagram
-  - Database schema
-  - Testing strategy
-  - Implementation checklist
+- [x] **docs/40_features/f0001_sign_in_with_google/** - Complete feature example
+  - [x] **f0001_sign_in_with_google.md** - Feature specification (IMMUTABLE INPUT)
+    - Acceptance criteria (functional, non-functional, security)
+    - User stories with Gherkin scenarios
+    - API specification
+    - Sequence diagram
+    - Database schema
+    - Testing strategy
+    - High-level implementation checklist
+  - [x] **plan.md** - Detailed implementation plan (LIVING DOCUMENT)
+    - 9 phases with step-by-step tasks
+    - Documentation references for each task
+    - Code examples and commands
+    - Progress tracking with checkboxes
+    - Estimated 8 hours total
   - Serves as template for all future features
 
 ### Operations Documentation
@@ -193,12 +200,16 @@ docker-compose up -d
 ```
 
 **Workflow for F0001 (Sign in with Google)**:
-1. Feature file already exists: `docs/40_features/f0001_sign_in_with_google.md`
-2. Create GitHub Issue using `.github/ISSUE_TEMPLATE/feature.yml`
-3. Link issue to feature file
-4. Implement on branch: `feature/f0001-sign-in-with-google`
-5. Commit with issue reference: `feat(identity): add Google auth (#issue-number)`
-6. Create PR with `Closes #issue-number`
+1. ✅ Feature specification complete: `docs/40_features/f0001_sign_in_with_google/f0001_sign_in_with_google.md`
+2. ✅ Implementation plan ready: `docs/40_features/f0001_sign_in_with_google/plan.md`
+3. Create GitHub Issue using `.github/ISSUE_TEMPLATE/feature.yml`
+4. Link issue to feature file (update feature file header with issue number)
+5. Implement following plan.md on branch: `feature/f0001-sign-in-with-google`
+   - Follow plan.md phases sequentially
+   - Check off tasks as completed
+   - Update plan.md with progress and notes
+6. Commit with issue reference: `feat(identity): add Google auth (#issue-number)`
+7. Create PR with `Closes #issue-number`
 
 **2. Write More Docs** (Optional)
 - Architecture overview with diagrams
