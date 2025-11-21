@@ -77,6 +77,17 @@
   - Implementation checklist
   - Serves as template for all future features
 
+### Operations Documentation
+- [x] **docs/60_operations/feature-workflow.md** - Feature-driven development workflow
+  - Hybrid approach (comprehensive feature files + lightweight GitHub Issues)
+  - Complete workflow from planning to completion
+  - Daily workflow examples
+  - Feature lifecycle example (4-day implementation)
+
+### GitHub Integration
+- [x] **.github/ISSUE_TEMPLATE/feature.yml** - Feature issue template
+- [x] **.github/labels.yml** - Label definitions (priority, type, service, size, status)
+
 ---
 
 ## 🔄 In Progress (Next Steps)
@@ -112,10 +123,11 @@
 | **Microservices** | 1/9 | 11% | 🟡 IdentityService done, rest TBD |
 | **Features** | 1/1 | 100% | ✅ **Template complete** (f0001 serves as example) |
 | **References** | 1/3 | 33% | ✅ Glossary done (others optional) |
-| **Operations** | 0/4 | 0% | 🟡 Can write during deployment |
+| **Operations** | 1/4 | 25% | ✅ Feature workflow complete |
+| **GitHub Integration** | 2/2 | 100% | ✅ Issue template + labels |
 
-**Total Critical Docs**: 14/20 (70%) ✅
-**Total All Docs**: 14/50+ (28%)
+**Total Critical Docs**: 17/22 (77%) ✅
+**Total All Docs**: 17/50+ (34%)
 
 **Critical Path Complete**: ✅ YES! **Ready to start coding IdentityService.**
 
@@ -165,9 +177,9 @@ When implementing, always reference:
 
 ## 🚀 Recommended Next Action
 
-### ✅ **Option A Complete!**
+### ✅ **Option A Complete! GitHub Integration Complete!**
 
-All critical documentation is done. You can now:
+All critical documentation is done, including feature workflow and GitHub setup. You can now:
 
 **1. Start Implementing IdentityService** (Recommended)
 ```bash
@@ -177,14 +189,18 @@ docker-compose up -d
 # Create src/Services/Identity/ following Layered template
 # Reference: docs/10_architecture/03_service-templates.md
 # Feature spec: docs/40_features/f0001_sign_in_with_google.md
+# Follow workflow: docs/60_operations/feature-workflow.md
 ```
 
-**2. Set Up GitHub Issues** (Optional - for feature tracking)
-- Discuss integration strategy
-- Create issue templates
-- Link features to issues
+**Workflow for F0001 (Sign in with Google)**:
+1. Feature file already exists: `docs/40_features/f0001_sign_in_with_google.md`
+2. Create GitHub Issue using `.github/ISSUE_TEMPLATE/feature.yml`
+3. Link issue to feature file
+4. Implement on branch: `feature/f0001-sign-in-with-google`
+5. Commit with issue reference: `feat(identity): add Google auth (#issue-number)`
+6. Create PR with `Closes #issue-number`
 
-**3. Write More Docs** (Optional)
+**2. Write More Docs** (Optional)
 - Architecture overview with diagrams
 - Feature roadmap index
 - Additional microservice specs (Profile, Matching)
@@ -207,4 +223,6 @@ docker-compose up -d
 
 ---
 
-**Status**: 🎉 **Option A Complete!** Infrastructure + critical docs ready. Can start coding immediately.
+**Status**: 🎉 **Option A Complete! GitHub Integration Complete!** Infrastructure + critical docs + feature workflow ready. Can start coding immediately.
+
+**Last Updated**: 2025-11-21

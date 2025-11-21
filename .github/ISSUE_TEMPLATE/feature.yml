@@ -1,0 +1,132 @@
+name: Feature Request
+description: Create a new feature for QuietMatch
+title: "[Feature ID]: Brief feature title"
+labels: ["type: feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Template
+        Use this template to create a feature issue that links to a comprehensive feature file.
+
+        **Before creating this issue:**
+        1. Create feature file: `docs/40_features/f####_feature_name.md`
+        2. Fill in comprehensive specification (use f0001 as template)
+        3. Commit feature file to repository
+        4. Then create this issue
+
+  - type: input
+    id: feature_id
+    attributes:
+      label: Feature ID
+      description: Feature identifier (e.g., F0002, F0003)
+      placeholder: "F0002"
+    validations:
+      required: true
+
+  - type: input
+    id: feature_file
+    attributes:
+      label: Feature File
+      description: Path to the comprehensive feature specification
+      placeholder: "docs/40_features/f0002_create_profile.md"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How critical is this feature?
+      options:
+        - P0 - Critical (MVP blocker)
+        - P1 - High (should have)
+        - P2 - Medium (nice to have)
+        - P3 - Low (future)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: service
+    attributes:
+      label: Primary Service
+      description: Which microservice owns this feature?
+      options:
+        - Identity
+        - Profile
+        - Matching
+        - Scheduling
+        - Notification
+        - Verification
+        - Payment
+        - RealTime
+        - GraphQL Gateway
+        - Infrastructure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: Estimated Size
+      description: How much effort is required?
+      options:
+        - XS (< 2 hours)
+        - S (2-4 hours)
+        - M (4-8 hours)
+        - L (1-2 days)
+        - XL (> 2 days - consider splitting)
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One-sentence description of what this feature does
+      placeholder: "Add Google OAuth sign-in flow with JWT token generation"
+    validations:
+      required: true
+
+  - type: textarea
+    id: key_acceptance_criteria
+    attributes:
+      label: Key Acceptance Criteria (Top 5)
+      description: List the 5 most important acceptance criteria (full list in feature file)
+      placeholder: |
+        - [ ] AC1: Most important criterion
+        - [ ] AC2: Second most important
+        - [ ] AC3: Third most important
+        - [ ] AC4: Fourth most important
+        - [ ] AC5: Fifth most important
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation_checklist
+    attributes:
+      label: Implementation Checklist (Key Tasks Only)
+      description: Top 5-7 implementation tasks (full checklist in feature file)
+      placeholder: |
+        - [ ] Create domain entities
+        - [ ] Implement service layer
+        - [ ] Add API endpoints
+        - [ ] Write unit tests
+        - [ ] Write integration tests
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ## Next Steps
+
+        After creating this issue:
+        1. Note the issue number (e.g., #5)
+        2. Update feature file header with GitHub Issue link
+        3. Commit feature file update
+        4. Start implementation on feature branch: `feature/f####-feature-name`
+        5. Reference this issue in all commits: `feat(service): description (#5)`
+        6. Create PR with `Closes #5` to auto-close when merged

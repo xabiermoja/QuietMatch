@@ -1,0 +1,151 @@
+# GitHub Labels Configuration for QuietMatch
+# These labels support the hybrid feature-driven development approach (Option 4)
+#
+# To create these labels automatically, install https://github.com/micnncim/action-label-syncer
+# Or create them manually via GitHub Issues > Labels
+
+# Priority Labels
+- name: "priority: P0"
+  color: "d73a4a"
+  description: "Critical - MVP blocker, must have for launch"
+
+- name: "priority: P1"
+  color: "e99695"
+  description: "High - Should have, important for user experience"
+
+- name: "priority: P2"
+  color: "fbca04"
+  description: "Medium - Nice to have, can defer if needed"
+
+- name: "priority: P3"
+  color: "d4c5f9"
+  description: "Low - Future enhancement, not urgent"
+
+# Type Labels
+- name: "type: feature"
+  color: "0e8a16"
+  description: "New feature or functionality"
+
+- name: "type: bug"
+  color: "d73a4a"
+  description: "Something isn't working as expected"
+
+- name: "type: enhancement"
+  color: "a2eeef"
+  description: "Improvement to existing feature"
+
+- name: "type: docs"
+  color: "0075ca"
+  description: "Documentation updates or additions"
+
+- name: "type: refactor"
+  color: "5319e7"
+  description: "Code refactoring without changing behavior"
+
+- name: "type: infrastructure"
+  color: "1d76db"
+  description: "Infrastructure, DevOps, deployment changes"
+
+# Service Labels (Microservices)
+- name: "service: identity"
+  color: "c2e0c6"
+  description: "IdentityService (authentication, authorization)"
+
+- name: "service: profile"
+  color: "bfdadc"
+  description: "ProfileService (member profiles, preferences)"
+
+- name: "service: matching"
+  color: "f9d0c4"
+  description: "MatchingService (compatibility algorithm)"
+
+- name: "service: scheduling"
+  color: "fef2c0"
+  description: "SchedulingService (blind date scheduling)"
+
+- name: "service: notification"
+  color: "d4c5f9"
+  description: "NotificationService (emails, push notifications)"
+
+- name: "service: verification"
+  color: "c5def5"
+  description: "VerificationService (identity verification)"
+
+- name: "service: payment"
+  color: "bfd4f2"
+  description: "PaymentService (subscriptions, payments)"
+
+- name: "service: realtime"
+  color: "fad8c7"
+  description: "RealTimeService (SignalR, live updates)"
+
+- name: "service: graphql"
+  color: "e99695"
+  description: "GraphQL Gateway (API aggregation)"
+
+- name: "service: infrastructure"
+  color: "d1d5da"
+  description: "Shared infrastructure, BuildingBlocks"
+
+# Size Labels (Effort Estimation)
+- name: "size: XS"
+  color: "c5def5"
+  description: "< 2 hours of work"
+
+- name: "size: S"
+  color: "bfdadc"
+  description: "2-4 hours of work"
+
+- name: "size: M"
+  color: "fbca04"
+  description: "4-8 hours of work"
+
+- name: "size: L"
+  color: "e99695"
+  description: "1-2 days of work"
+
+- name: "size: XL"
+  color: "d73a4a"
+  description: "> 2 days (consider splitting into smaller features)"
+
+# Architecture Labels (Learning Focus - Optional)
+- name: "arch: layered"
+  color: "d4c5f9"
+  description: "Layered architecture pattern"
+
+- name: "arch: onion"
+  color: "d4c5f9"
+  description: "Onion architecture pattern"
+
+- name: "arch: hexagonal"
+  color: "d4c5f9"
+  description: "Hexagonal (Ports & Adapters) pattern"
+
+- name: "arch: cqrs"
+  color: "d4c5f9"
+  description: "CQRS pattern"
+
+- name: "arch: saga"
+  color: "5319e7"
+  description: "SAGA pattern for distributed transactions"
+
+# Workflow Labels (Status)
+- name: "status: backlog"
+  color: "ededed"
+  description: "In backlog, not started"
+
+- name: "status: in-progress"
+  color: "fbca04"
+  description: "Currently being worked on"
+
+- name: "status: review"
+  color: "0e8a16"
+  description: "PR created, awaiting review"
+
+- name: "status: blocked"
+  color: "d73a4a"
+  description: "Blocked by dependency or issue"
+
+- name: "status: done"
+  color: "0e8a16"
+  description: "Completed and merged"

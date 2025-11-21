@@ -282,21 +282,35 @@ See: `docs/10_architecture/07_deployment-and-devops.md`
 
 ## 📋 **FEATURE DEVELOPMENT WORKFLOW**
 
+### Quick Overview
+
+QuietMatch uses a **hybrid feature-driven approach**:
+- **Feature Files** (`docs/40_features/f####_feature_name.md`): Comprehensive specifications (source of truth)
+- **GitHub Issues**: Lightweight tracking, links to feature file
+
+**Full Workflow Documentation**: [`docs/60_operations/feature-workflow.md`](../docs/60_operations/feature-workflow.md)
+
 ### Implementing a New Feature
 
-1. **Create/Update Feature File**: `docs/40_features/f000X_feature_name.md`
-2. **Design Domain Model**: Update `docs/20_domain/01_domain-ubiquitous-language.md` if new concepts
-3. **Choose Architecture Pattern**: Follow assigned microservice pattern
-4. **Implement**:
+1. **Create Feature File**: `docs/40_features/f####_feature_name.md` (use f0001 as template)
+   - Fill in ALL sections (acceptance criteria, API specs, diagrams, testing strategy)
+   - Commit to repository
+2. **Create GitHub Issue**: Use issue template, reference feature file
+   - Include top 5 acceptance criteria only (full list in feature file)
+   - Add labels: priority, service, size
+   - Link to feature file
+3. **Link Bidirectionally**: Update feature file header with GitHub issue number
+4. **Implement on Feature Branch**: `feature/f####-feature-name`
    - Write domain models first
    - Add application services
    - Add infrastructure (DB, messaging)
    - Add API endpoints
    - Write tests
-5. **Update Documentation**:
-   - Update microservice README
-   - Update API documentation
-   - Update SAGA docs if workflow spans services
+   - Reference issue in commits: `feat(service): description (#issue-number)`
+5. **Create Pull Request**: Use `Closes #issue-number` to auto-close
+6. **Update Documentation**: Mark feature as complete, update PROGRESS.md if milestone complete
+
+**See**: [`docs/60_operations/feature-workflow.md`](../docs/60_operations/feature-workflow.md) for complete step-by-step guide
 
 ---
 
