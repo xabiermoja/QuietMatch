@@ -2,7 +2,9 @@ using DatingApp.IdentityService.Application.DTOs;
 using DatingApp.IdentityService.Domain.Entities;
 using DatingApp.IdentityService.Domain.Enums;
 using DatingApp.IdentityService.Domain.Repositories;
+using DatingApp.IdentityService.Infrastructure.Events;
 using DatingApp.IdentityService.Infrastructure.Services;
+using MassTransit;
 using Microsoft.Extensions.Logging;
 
 namespace DatingApp.IdentityService.Application.Services;
@@ -20,6 +22,7 @@ public class AuthService
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IPublishEndpoint _publishEndpoint;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -27,12 +30,14 @@ public class AuthService
         IJwtTokenGenerator jwtTokenGenerator,
         IUserRepository userRepository,
         IRefreshTokenRepository refreshTokenRepository,
+        IPublishEndpoint publishEndpoint,
         ILogger<AuthService> logger)
     {
         _googleAuthService = googleAuthService ?? throw new ArgumentNullException(nameof(googleAuthService));
         _jwtTokenGenerator = jwtTokenGenerator ?? throw new ArgumentNullException(nameof(jwtTokenGenerator));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _refreshTokenRepository = refreshTokenRepository ?? throw new ArgumentNullException(nameof(refreshTokenRepository));
+        _publishEndpoint = publishEndpoint ?? throw new ArgumentNullException(nameof(publishEndpoint));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -92,8 +97,21 @@ public class AuthService
                 user.Id,
                 user.Email);
 
-            // TODO Phase 6: Publish UserRegistered event for ProfileService
-            // await _publishEndpoint.Publish(new UserRegistered(...), ct);
+            // Publish UserRegistered event for ProfileService
+            var userRegisteredEvent = new UserRegistered(
+                UserId: user.Id,
+                Email: user.Email,
+                Provider: user.Provider.ToString(),
+                RegisteredAt: user.CreatedAt,
+                CorrelationId: Guid.NewGuid()
+            );
+
+            await _publishEndpoint.Publish(userRegisteredEvent, ct);
+
+            _logger.LogInformation(
+                "Published UserRegistered event for UserId={UserId}, CorrelationId={CorrelationId}",
+                user.Id,
+                userRegisteredEvent.CorrelationId);
         }
         else
         {

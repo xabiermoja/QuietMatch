@@ -4,6 +4,7 @@ using DatingApp.IdentityService.Domain.Repositories;
 using DatingApp.IdentityService.Infrastructure.Data;
 using DatingApp.IdentityService.Infrastructure.Repositories;
 using DatingApp.IdentityService.Infrastructure.Services;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -35,6 +36,34 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
 // Application Services
 builder.Services.AddScoped<AuthService>();
+
+// MassTransit (Message Bus)
+builder.Services.AddMassTransit(x =>
+{
+    // Configure RabbitMQ for local development
+    if (builder.Environment.IsDevelopment())
+    {
+        x.UsingRabbitMq((context, cfg) =>
+        {
+            cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
+            {
+                h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
+                h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
+            });
+
+            cfg.ConfigureEndpoints(context);
+        });
+    }
+    else
+    {
+        // TODO: Configure Azure Service Bus for production
+        // x.UsingAzureServiceBus((context, cfg) =>
+        // {
+        //     cfg.Host(builder.Configuration["AzureServiceBus:ConnectionString"]);
+        //     cfg.ConfigureEndpoints(context);
+        // });
+    }
+});
 
 // JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
