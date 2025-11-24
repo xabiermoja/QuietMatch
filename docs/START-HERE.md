@@ -78,6 +78,8 @@ docs/
 | Learn about the ProfileService (Onion) | [`30_microservices/profile-service.md`](30_microservices/profile-service.md) |
 | Learn about the MatchingService (Hexagonal) | [`30_microservices/matching-service.md`](30_microservices/matching-service.md) |
 | Add a new microservice | [`10_architecture/02_architecture-guidelines.md`](10_architecture/02_architecture-guidelines.md) (New Service Checklist) |
+| Track future work and technical debt | [`/TODO.md`](../TODO.md) - Project TODO list |
+| Learn TODO management process | [`60_operations/todo-management.md`](60_operations/todo-management.md) |
 
 > **Pro Tip**: Each microservice has its own `PATTERNS.md` file in its source folder explaining the architecture pattern in detail, with alternatives and trade-offs.
 

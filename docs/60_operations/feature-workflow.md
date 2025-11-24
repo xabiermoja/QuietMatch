@@ -584,6 +584,9 @@ git commit -m "test(profile): add tests for F0002 (#5)"
 - 📝 Add notes to plan.md about implementation decisions and discoveries (within scope)
 - ⏰ Update "Last Updated" timestamp in plan.md regularly
 - 🔄 Update issue checkboxes periodically (optional, not required)
+- 📋 **Add TODOs for future work**: When you discover work that's out of current scope, add it to `/TODO.md`
+  - See [TODO Management Guidelines](../60_operations/todo-management.md) for format
+  - Examples: Production hardening, missing endpoints, future enhancements
 - 💾 Commit plan.md updates frequently:
   ```bash
   git add docs/40_features/f0002_your_feature/plan.md
