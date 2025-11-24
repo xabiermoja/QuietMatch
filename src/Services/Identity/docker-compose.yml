@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: identity-postgres
+    environment:
+      POSTGRES_DB: identity_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: devpassword123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d identity_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - identity-network
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: identity-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - identity-network
+
+  # Seq for Structured Logging (optional but recommended)
+  seq:
+    image: datalust/seq:latest
+    container_name: identity-seq
+    environment:
+      ACCEPT_EULA: Y
+    ports:
+      - "5341:80" # Seq UI
+    volumes:
+      - seq_data:/data
+    networks:
+      - identity-network
+
+  # IdentityService API
+  identity-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: identity-service-api
+    environment:
+      # ASP.NET Core
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+
+      # Database
+      ConnectionStrings__IdentityDb: "Host=postgres;Port=5432;Database=identity_db;Username=admin;Password=devpassword123"
+
+      # JWT (WARNING: Use secure keys in production!)
+      Jwt__SecretKey: "ThisIsAVerySecretKeyForDevelopmentOnlyDoNotUseInProduction256Bits"
+      Jwt__Issuer: "https://quietmatch.com"
+      Jwt__Audience: "https://api.quietmatch.com"
+      Jwt__AccessTokenExpiryMinutes: "15"
+
+      # Google OAuth (Replace with your values)
+      Google__ClientId: "your-client-id.apps.googleusercontent.com"
+      Google__ClientSecret: "your-client-secret"
+
+      # RabbitMQ
+      RabbitMq__Host: "rabbitmq"
+      RabbitMq__Username: "guest"
+      RabbitMq__Password: "guest"
+
+      # Seq Logging
+      Serilog__WriteTo__1__Name: "Seq"
+      Serilog__WriteTo__1__Args__serverUrl: "http://seq:80"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      seq:
+        condition: service_started
+    networks:
+      - identity-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  seq_data:
+    driver: local
+
+networks:
+  identity-network:
+    driver: bridge
