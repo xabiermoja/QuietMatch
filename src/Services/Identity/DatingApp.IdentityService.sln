@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.IdentityService.Domain", "DatingApp.IdentityService.Domain\DatingApp.IdentityService.Domain.csproj", "{4E781993-6039-4E5B-AAA8-EB7A4E9392CF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.IdentityService.Application", "DatingApp.IdentityService.Application\DatingApp.IdentityService.Application.csproj", "{48A487F9-FA66-4561-9762-CF9ECF746378}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.IdentityService.Infrastructure", "DatingApp.IdentityService.Infrastructure\DatingApp.IdentityService.Infrastructure.csproj", "{7ADCD06B-7C67-4DD2-83E0-9190C8BC99B5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.IdentityService.Api", "DatingApp.IdentityService.Api\DatingApp.IdentityService.Api.csproj", "{9A242EB8-6F72-4440-9AD5-5C57D6FCDDE2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.IdentityService.Tests.Unit", "DatingApp.IdentityService.Tests.Unit\DatingApp.IdentityService.Tests.Unit.csproj", "{462907B3-FD3E-4817-A58E-ECEC921FC6EB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.IdentityService.Tests.Integration", "DatingApp.IdentityService.Tests.Integration\DatingApp.IdentityService.Tests.Integration.csproj", "{CF1176C9-516C-4B83-A37E-91BBD5FE76A2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4E781993-6039-4E5B-AAA8-EB7A4E9392CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E781993-6039-4E5B-AAA8-EB7A4E9392CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E781993-6039-4E5B-AAA8-EB7A4E9392CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E781993-6039-4E5B-AAA8-EB7A4E9392CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48A487F9-FA66-4561-9762-CF9ECF746378}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48A487F9-FA66-4561-9762-CF9ECF746378}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48A487F9-FA66-4561-9762-CF9ECF746378}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48A487F9-FA66-4561-9762-CF9ECF746378}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7ADCD06B-7C67-4DD2-83E0-9190C8BC99B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7ADCD06B-7C67-4DD2-83E0-9190C8BC99B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7ADCD06B-7C67-4DD2-83E0-9190C8BC99B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7ADCD06B-7C67-4DD2-83E0-9190C8BC99B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A242EB8-6F72-4440-9AD5-5C57D6FCDDE2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A242EB8-6F72-4440-9AD5-5C57D6FCDDE2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A242EB8-6F72-4440-9AD5-5C57D6FCDDE2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A242EB8-6F72-4440-9AD5-5C57D6FCDDE2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{462907B3-FD3E-4817-A58E-ECEC921FC6EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{462907B3-FD3E-4817-A58E-ECEC921FC6EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{462907B3-FD3E-4817-A58E-ECEC921FC6EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{462907B3-FD3E-4817-A58E-ECEC921FC6EB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF1176C9-516C-4B83-A37E-91BBD5FE76A2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF1176C9-516C-4B83-A37E-91BBD5FE76A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF1176C9-516C-4B83-A37E-91BBD5FE76A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF1176C9-516C-4B83-A37E-91BBD5FE76A2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

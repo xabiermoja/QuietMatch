@@ -1,0 +1,51 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+
+# Test projects
+**/*.Tests.Unit/
+**/*.Tests.Integration/
+**/TestResults/
+
+# IDE files
+.vs/
+.vscode/
+*.suo
+*.user
+*.sln.docstates
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+LICENSE
+
+# Docker files (don't copy into image)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Environment files with secrets
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+!appsettings.Docker.json
+
+# NuGet packages
+*.nupkg
+*.snupkg
+
+# Build logs
+*.log
+
+# Migration scripts (applied separately)
+**/Migrations/

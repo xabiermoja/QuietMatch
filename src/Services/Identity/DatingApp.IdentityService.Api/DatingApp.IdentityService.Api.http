@@ -1,0 +1,6 @@
+@DatingApp.IdentityService.Api_HostAddress = http://localhost:5209
+
+GET {{DatingApp.IdentityService.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

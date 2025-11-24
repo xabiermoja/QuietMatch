@@ -1,0 +1,146 @@
+# CodeRabbit AI Code Review Configuration
+# https://coderabbit.ai/
+
+# Review settings
+reviews:
+  auto_review: true
+  auto_incremental_review: true
+
+  # Request changes only for critical issues
+  request_changes_workflow: true
+
+  # Enable high-level summary
+  high_level_summary: true
+
+  # Enable poem/fun mode (optional, makes reviews more engaging)
+  poem: false
+
+  # Review effort threshold (small/medium/large)
+  review_status_comment: true
+
+# Language-specific settings
+language_settings:
+  csharp:
+    # Enable C# specific checks
+    enabled: true
+
+    # Check for common C# patterns
+    check_naming_conventions: true
+    check_null_handling: true
+    check_async_best_practices: true
+    check_linq_usage: true
+
+  dockerfile:
+    enabled: true
+    check_security: true
+    check_best_practices: true
+
+# Path-specific rules
+path_instructions:
+  - path: "src/Services/Identity/**/*.cs"
+    instructions: |
+      - Verify layered architecture boundaries are maintained (no upward dependencies)
+      - Check for proper async/await usage
+      - Ensure SOLID principles are followed
+      - Verify comprehensive error handling
+      - Check for security vulnerabilities (SQL injection, XSS, etc.)
+      - Ensure sensitive data is not logged
+      - Verify proper use of dependency injection
+
+  - path: "src/Services/Identity/**/Tests/**/*.cs"
+    instructions: |
+      - Ensure tests follow AAA pattern (Arrange, Act, Assert)
+      - Verify test names clearly describe what is being tested
+      - Check for proper use of mocks vs stubs
+      - Ensure tests are independent and don't rely on execution order
+      - Verify edge cases are covered
+
+  - path: "src/Services/Identity/Dockerfile"
+    instructions: |
+      - Check for security best practices (non-root user, minimal base image)
+      - Verify multi-stage build optimization
+      - Check for proper layer caching
+      - Ensure no secrets in image
+
+  - path: "**/*.md"
+    instructions: |
+      - Check for broken links
+      - Verify code examples are correct and up-to-date
+      - Ensure consistent formatting
+      - Check spelling and grammar
+
+# Ignore patterns
+ignore_patterns:
+  - "**/bin/**"
+  - "**/obj/**"
+  - "**/Migrations/**"
+  - "**/*.Designer.cs"
+  - "**/packages/**"
+  - "**/.vs/**"
+
+# Custom prompts for specific review aspects
+review_prompts:
+  security:
+    - "Are there any potential security vulnerabilities?"
+    - "Is sensitive data properly protected?"
+    - "Are authentication and authorization properly implemented?"
+    - "Are tokens properly hashed before storage?"
+
+  performance:
+    - "Are database queries optimized?"
+    - "Is async/await used properly?"
+    - "Are there any N+1 query issues?"
+    - "Is proper caching used where appropriate?"
+
+  maintainability:
+    - "Is the code easy to understand?"
+    - "Are there any code smells?"
+    - "Is the code DRY (Don't Repeat Yourself)?"
+    - "Are naming conventions followed?"
+
+  testing:
+    - "Is there adequate test coverage?"
+    - "Are edge cases tested?"
+    - "Are tests clear and maintainable?"
+
+# Enable specific checks
+checks:
+  # Code quality
+  code_smell: true
+  complexity: true
+  duplication: true
+
+  # Security
+  security_vulnerability: true
+  hardcoded_secrets: true
+
+  # Best practices
+  naming_conventions: true
+  error_handling: true
+  logging: true
+
+  # Performance
+  async_await: true
+  database_queries: true
+
+# Feedback settings
+feedback:
+  # Tone of feedback
+  tone: "constructive"
+
+  # Detail level (concise/normal/detailed)
+  detail_level: "normal"
+
+  # Provide code suggestions
+  provide_code_suggestions: true
+
+  # Explain reasoning
+  explain_reasoning: true
+
+# Integration settings
+integrations:
+  # Link to relevant documentation
+  documentation_links: true
+
+  # Suggest related issues/PRs
+  suggest_related_work: false
