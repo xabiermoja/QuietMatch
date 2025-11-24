@@ -207,6 +207,236 @@ cat .dockerignore
 3. Review `.github/.coderabbit.yaml` syntax
 4. Re-trigger: Close and reopen PR
 
+---
+
+## Common CI Issues (Lessons from F0001)
+
+> **Based on real issues encountered during IdentityService implementation**
+
+### Issue 1: Build Succeeds, Tests Fail with "Invalid Argument"
+
+**Symptoms**:
+```
+The argument /path/to/Tests.Unit.dll is invalid
+MSB4181: The "VSTestTask" task returned false but did not log an error
+```
+
+**Root Cause**:
+- Workflow only builds the API project: `dotnet build Api.csproj`
+- Tries to run tests with `--no-build` flag
+- Test project DLL was never built, so it doesn't exist
+
+**Solution**:
+```yaml
+# ❌ BAD - Only builds one project
+- name: Restore dependencies
+  run: dotnet restore src/Services/Identity/DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj
+
+- name: Build
+  run: dotnet build src/Services/Identity/DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj --configuration Release --no-restore
+
+# ✅ GOOD - Builds entire solution
+- name: Restore dependencies
+  run: dotnet restore src/Services/Identity/DatingApp.IdentityService.sln
+
+- name: Build
+  run: dotnet build src/Services/Identity/DatingApp.IdentityService.sln --configuration Release --no-restore
+```
+
+**Why This Happens**:
+- Building a single project only builds its direct dependencies
+- Test projects reference the API/Application/Infrastructure projects, but the reverse isn't true
+- Building the API project doesn't trigger building the test project
+- Solution files know about all projects and build everything
+
+**Best Practice**:
+- Always restore and build the **solution file** (*.sln) in CI
+- Only build individual projects if you're 100% sure they don't need others
+- Use `--no-build` in test step only if you built the entire solution first
+
+---
+
+### Issue 2: Docker Build Succeeds, Trivy Scan Fails with "No Such Image"
+
+**Symptoms**:
+```
+Fatal error: unable to find the specified image "identity-service:abc123" in ["docker" "containerd" "podman" "remote"]
+docker error: unable to inspect the image: Error response from daemon: No such image: identity-service:abc123
+```
+
+**Root Cause**:
+- `docker/build-push-action` uses Docker Buildx by default
+- Buildx builds images but doesn't load them into Docker daemon
+- Trivy scans images from the Docker daemon
+- Image exists in Buildx cache but not in Docker daemon
+
+**Solution**:
+```yaml
+# ❌ BAD - Image not available for scanning
+- name: Build Docker image
+  uses: docker/build-push-action@v5
+  with:
+    context: ./src/Services/Identity
+    file: ./src/Services/Identity/Dockerfile
+    push: false
+    tags: identity-service:${{ github.sha }}
+
+# ✅ GOOD - Image loaded into daemon
+- name: Build Docker image
+  uses: docker/build-push-action@v5
+  with:
+    context: ./src/Services/Identity
+    file: ./src/Services/Identity/Dockerfile
+    push: false
+    load: true  # ← This is the key!
+    tags: identity-service:${{ github.sha }}
+```
+
+**Why This Happens**:
+- Docker Buildx is designed for multi-platform builds and pushing to registries
+- It optimizes by not loading images into the local daemon by default
+- Scanning tools like Trivy expect images in the local Docker daemon
+- `load: true` explicitly loads the image after building
+
+**Best Practice**:
+- Use `load: true` when you need to scan or run the image locally in CI
+- Use `push: true` when deploying to a registry (mutually exclusive with load)
+- If you need both (scan and push), build twice or use a registry-based scanner
+
+**Additional Fix**:
+Also update CodeQL action version:
+```yaml
+# ❌ DEPRECATED
+- uses: github/codeql-action/upload-sarif@v2
+
+# ✅ CURRENT
+- uses: github/codeql-action/upload-sarif@v3
+```
+(v1 and v2 deprecated as of 2025-01-10)
+
+---
+
+### Issue 3: Tests Pass, But CI Fails with "Resource Not Accessible"
+
+**Symptoms**:
+```
+##[error]HttpError: Resource not accessible by integration
+```
+- Tests run successfully (55/55 passing)
+- Test reporter action fails
+- SARIF upload to Security tab fails
+
+**Root Cause**:
+- GitHub Actions jobs have restricted permissions by default
+- Test reporter needs `checks: write` to create check runs
+- Security scanning needs `security-events: write` to upload SARIF
+- PR annotations need `pull-requests: write`
+
+**Solution**:
+```yaml
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    # ✅ Add explicit permissions
+    permissions:
+      contents: read           # Checkout code
+      checks: write            # Create check runs
+      pull-requests: write     # Add PR annotations
+
+    steps:
+      # ... your steps
+
+  docker-build:
+    runs-on: ubuntu-latest
+    # ✅ Add explicit permissions
+    permissions:
+      contents: read           # Checkout code
+      security-events: write   # Upload SARIF to Security tab
+
+    steps:
+      # ... your steps
+```
+
+**Why This Happens**:
+- GitHub Actions uses the GITHUB_TOKEN with limited default permissions
+- Actions that create check runs, annotate PRs, or upload security data need explicit permissions
+- This is a security feature to prevent malicious actions from accessing resources
+
+**Best Practice**:
+- Always add explicit `permissions:` block to jobs that use:
+  - Test reporters (needs `checks: write`)
+  - PR annotators (needs `pull-requests: write`)
+  - Security scanners (needs `security-events: write`)
+  - Status checks (needs `statuses: write`)
+- Use principle of least privilege: only grant permissions the job actually needs
+- Don't grant `write-all` or `permissions: {}` unless absolutely necessary
+
+**Common Permissions**:
+```yaml
+permissions:
+  contents: read          # Read repository code (checkout)
+  contents: write         # Push to repository (auto-merge, etc.)
+  checks: write           # Create/update check runs
+  pull-requests: write    # Comment on PRs, add annotations
+  issues: write           # Create/update issues
+  security-events: write  # Upload code scanning results (SARIF)
+  statuses: write         # Create commit statuses
+```
+
+---
+
+## Setting Up CI for New Services
+
+When creating CI workflows for ProfileService, MatchingService, etc., use this checklist:
+
+### Workflow Configuration
+- [ ] Trigger on PR and push to `main`/`develop`
+- [ ] Filter paths to service directory: `src/Services/YourService/**`
+- [ ] Filter paths to include workflow file itself: `.github/workflows/your-service-ci.yml`
+
+### Build & Test Job
+- [ ] Add `permissions` block with `contents: read`, `checks: write`, `pull-requests: write`
+- [ ] Restore and build the **solution file** (*.sln), not individual projects
+- [ ] Run tests with `--no-build` flag (since solution was already built)
+- [ ] Use `if: always()` for test reporting steps so they run even if tests fail
+- [ ] Configure test result reporter with proper permissions
+
+### Code Quality Job
+- [ ] Format check should target the **solution file** (*.sln)
+- [ ] Install `dotnet-format` as global tool
+- [ ] Use `--verify-no-changes` flag to fail if formatting issues found
+
+### Docker Build Job
+- [ ] Add `permissions` block with `contents: read`, `security-events: write`
+- [ ] Set up Docker Buildx
+- [ ] Build with `load: true` if you're scanning the image
+- [ ] Tag with `${{ github.sha }}` for uniqueness
+- [ ] Use GitHub Actions cache: `cache-from: type=gha`, `cache-to: type=gha,mode=max`
+- [ ] Scan with Trivy using the loaded image
+- [ ] Upload SARIF results with CodeQL action **v3** (not v2)
+- [ ] Use `if: always()` for SARIF upload so results are uploaded even if scan finds issues
+
+### Service Dependencies
+If your service needs database or message broker for tests:
+```yaml
+services:
+  postgres:
+    image: postgres:16-alpine
+    env:
+      POSTGRES_DB: your_service_db_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - 5432:5432
+    options: >-
+      --health-cmd pg_isready
+      --health-interval 10s
+      --health-timeout 5s
+      --health-retries 5
+```
+
+---
+
 ## Performance Benchmarks
 
 ### Expected CI Times

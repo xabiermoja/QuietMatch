@@ -377,6 +377,10 @@ ignore_patterns:
 
 ## Troubleshooting CI
 
+> **💡 For detailed CI troubleshooting with real examples from F0001**, see [CI/CD Reference - Common CI Issues](02_ci_cd_reference.md#common-ci-issues-lessons-from-f0001)
+>
+> Covers: Build/test failures, Docker scan issues, GitHub Actions permissions
+
 ### Build Fails
 
 **Check**:
