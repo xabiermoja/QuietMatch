@@ -48,10 +48,10 @@ jobs:
           ${{ runner.os }}-nuget-
 
     - name: Restore dependencies
-      run: dotnet restore src/Services/Identity/DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj
+      run: dotnet restore src/Services/Identity/DatingApp.IdentityService.sln
 
     - name: Build
-      run: dotnet build src/Services/Identity/DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj --configuration Release --no-restore
+      run: dotnet build src/Services/Identity/DatingApp.IdentityService.sln --configuration Release --no-restore
 
     - name: Run Unit Tests
       run: dotnet test src/Services/Identity/DatingApp.IdentityService.Tests.Unit/DatingApp.IdentityService.Tests.Unit.csproj --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=unit-test-results.trx"
@@ -99,7 +99,7 @@ jobs:
       run: dotnet tool install -g dotnet-format
 
     - name: Check code formatting
-      run: dotnet format src/Services/Identity/DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj --verify-no-changes --verbosity diagnostic
+      run: dotnet format src/Services/Identity/DatingApp.IdentityService.sln --verify-no-changes --verbosity diagnostic
 
     - name: Run Security Scan
       uses: security-code-scan/security-code-scan-add-action@main
