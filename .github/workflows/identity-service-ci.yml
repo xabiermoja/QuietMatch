@@ -1,0 +1,138 @@
+name: Identity Service CI
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/Services/Identity/**'
+      - '.github/workflows/identity-service-ci.yml'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/Services/Identity/**'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: identity_db_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore src/Services/Identity/DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj
+
+    - name: Build
+      run: dotnet build src/Services/Identity/DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj --configuration Release --no-restore
+
+    - name: Run Unit Tests
+      run: dotnet test src/Services/Identity/DatingApp.IdentityService.Tests.Unit/DatingApp.IdentityService.Tests.Unit.csproj --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=unit-test-results.trx"
+
+    - name: Publish Test Results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Unit Test Results
+        path: '**/unit-test-results.trx'
+        reporter: dotnet-trx
+
+    - name: Code Coverage Report
+      if: always()
+      run: |
+        dotnet test src/Services/Identity/DatingApp.IdentityService.Tests.Unit/DatingApp.IdentityService.Tests.Unit.csproj \
+          --configuration Release \
+          --no-build \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./coverage
+
+    - name: Upload Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      if: always()
+      with:
+        files: ./coverage/**/coverage.cobertura.xml
+        flags: unittests
+        name: codecov-identity-service
+
+  code-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better analysis
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Install dotnet format
+      run: dotnet tool install -g dotnet-format
+
+    - name: Check code formatting
+      run: dotnet format src/Services/Identity/DatingApp.IdentityService.Api/DatingApp.IdentityService.Api.csproj --verify-no-changes --verbosity diagnostic
+
+    - name: Run Security Scan
+      uses: security-code-scan/security-code-scan-add-action@main
+
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./src/Services/Identity
+        file: ./src/Services/Identity/Dockerfile
+        push: false
+        tags: identity-service:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Scan Docker image for vulnerabilities
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: identity-service:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
