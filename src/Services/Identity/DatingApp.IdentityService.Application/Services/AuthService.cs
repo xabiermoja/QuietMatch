@@ -153,4 +153,101 @@ public class AuthService
             Email: user.Email
         );
     }
+
+    /// <summary>
+    /// Refreshes an expired access token using a valid refresh token.
+    /// </summary>
+    /// <param name="refreshToken">The refresh token from the client</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>RefreshTokenResponse with new tokens if successful, null if validation failed</returns>
+    /// <remarks>
+    /// Implements OAuth 2.0 Refresh Token Flow (RFC 6749 Section 6).
+    ///
+    /// Flow:
+    /// 1. Hash the incoming refresh token
+    /// 2. Look up token in database by hash
+    /// 3. Validate token is not expired or revoked
+    /// 4. Get associated user
+    /// 5. Generate new access token
+    /// 6. Token Rotation: Generate new refresh token, revoke old one (security best practice)
+    /// 7. Return response with new tokens
+    ///
+    /// Security Considerations:
+    /// - Refresh tokens are hashed before storage (SHA-256)
+    /// - Token rotation prevents token replay attacks
+    /// - Expired/revoked tokens are rejected immediately
+    /// - Rate limiting should be applied at API level (5 requests/min recommended)
+    /// </remarks>
+    public async Task<RefreshTokenResponse?> RefreshTokenAsync(string refreshToken, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Processing refresh token request");
+
+        // 1. Hash the incoming refresh token (same algorithm used when storing)
+        var tokenHash = _jwtTokenGenerator.HashToken(refreshToken);
+
+        // 2. Look up token in database by hash
+        var storedToken = await _refreshTokenRepository.GetByTokenHashAsync(tokenHash, ct);
+
+        if (storedToken is null)
+        {
+            _logger.LogWarning("Refresh token not found in database (invalid or already rotated)");
+            return null;
+        }
+
+        // 3. Validate token is not expired or revoked
+        if (!storedToken.IsValid())
+        {
+            _logger.LogWarning(
+                "Refresh token validation failed - TokenId={TokenId}, IsRevoked={IsRevoked}, IsExpired={IsExpired}",
+                storedToken.Id,
+                storedToken.IsRevoked,
+                storedToken.IsExpired());
+            return null;
+        }
+
+        // 4. Get associated user
+        var user = await _userRepository.GetByIdAsync(storedToken.UserId, ct);
+
+        if (user is null)
+        {
+            _logger.LogError(
+                "User not found for valid refresh token - UserId={UserId}, TokenId={TokenId}",
+                storedToken.UserId,
+                storedToken.Id);
+            return null;
+        }
+
+        _logger.LogInformation(
+            "Refresh token validated successfully for UserId={UserId}",
+            user.Id);
+
+        // 5. Generate new access token
+        var newAccessToken = _jwtTokenGenerator.GenerateAccessToken(user.Id, user.Email);
+
+        // 6. Token Rotation: Generate new refresh token and revoke old one
+        var newRefreshTokenValue = _jwtTokenGenerator.GenerateRefreshToken();
+        var newRefreshTokenHash = _jwtTokenGenerator.HashToken(newRefreshTokenValue);
+
+        // Revoke old refresh token (security: prevent reuse)
+        storedToken.Revoke();
+        await _refreshTokenRepository.UpdateAsync(storedToken, ct);
+
+        // Create new refresh token entity (7 days validity)
+        var newRefreshToken = RefreshToken.Create(user.Id, newRefreshTokenHash, validityDays: 7);
+        await _refreshTokenRepository.AddAsync(newRefreshToken, ct);
+
+        _logger.LogInformation(
+            "Token rotation successful - OldTokenId={OldTokenId} revoked, NewTokenId={NewTokenId} created for UserId={UserId}",
+            storedToken.Id,
+            newRefreshToken.Id,
+            user.Id);
+
+        // 7. Return response with new tokens
+        return new RefreshTokenResponse(
+            AccessToken: newAccessToken,
+            RefreshToken: newRefreshTokenValue, // Return plain text token to client (only hash is stored)
+            ExpiresIn: 900, // 15 minutes = 900 seconds
+            TokenType: "Bearer"
+        );
+    }
 }
