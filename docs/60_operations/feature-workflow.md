@@ -6,6 +6,36 @@
 
 ---
 
+## ⚠️ **CRITICAL: Git Branching Rule**
+
+### NEVER Work Directly on `main`
+
+**Before starting ANY work, ALWAYS create a feature branch:**
+
+```bash
+# 1. Start from main and pull latest
+git checkout main
+git pull origin main
+
+# 2. Create feature branch (use appropriate naming)
+git checkout -b feature/f####-short-name    # For features (e.g., f0002-create-profile)
+git checkout -b feature/t####-short-name    # For TODO items (e.g., t0002-refresh-token)
+git checkout -b fix/short-description       # For bug fixes
+
+# 3. Verify you're on the new branch
+git branch  # Should show: * feature/...
+```
+
+**If you accidentally started work on `main`:**
+```bash
+# Your uncommitted changes will move with you
+git checkout -b feature/####-name
+```
+
+**No exceptions. ALL work happens on feature branches.**
+
+---
+
 ## Table of Contents
 
 - [Overview: Hybrid Approach](#overview-hybrid-approach)
