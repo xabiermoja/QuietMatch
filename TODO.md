@@ -143,12 +143,14 @@ The IdentityService is currently configured for development and local testing. B
 
 ---
 
-### 🟡 T0002: Implement Refresh Token Endpoint
+### 🟢 T0002: Implement Refresh Token Endpoint ✅
 
 **Source**: [F0001 - Sign In with Google](docs/40_features/f0001_sign_in_with_google/f0001_sign_in_with_google.md)
-**Status**: 🟡 Ready
+**Status**: 🟢 In Progress (PR #4 - Ready to Merge)
 **Effort**: 4-6 hours
 **Created**: 2025-11-24
+**Completed**: 2025-11-25
+**Pull Request**: [#4](https://github.com/xabiermoja/QuietMatch/pull/4)
 
 #### Description
 
@@ -451,11 +453,97 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 
 ---
 
+### 🟡 T0005: Fix Integration Test Infrastructure for IdentityService
+
+**Source**: [T0002 - Implement Refresh Token Endpoint](TODO.md)
+**Status**: 🟡 Ready
+**Effort**: 2-4 hours
+**Created**: 2025-11-25
+
+#### Description
+
+The IdentityService integration tests are failing due to a `ServiceProvider` disposal issue during `WebApplicationFactory` initialization. This prevents integration tests from running and verifying end-to-end API functionality.
+
+#### Current Limitations
+
+- ✅ Unit tests working perfectly (61/61 passing)
+- ✅ Application builds and runs successfully
+- ✅ API endpoints work correctly in manual testing
+- ❌ Integration tests fail during test setup (not during actual tests)
+- ❌ Cannot verify end-to-end flows automatically
+- ❌ CI/CD pipeline will fail on integration test step
+
+#### Error Details
+
+```
+System.ObjectDisposedException: Cannot access a disposed object.
+Object name: 'IServiceProvider'.
+  at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.ConfigureHostBuilder(IHostBuilder hostBuilder)
+  at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.EnsureServer()
+```
+
+**Affected Tests**:
+- All 7 integration tests in `AuthControllerIntegrationTests.cs`
+- Error occurs during `InitializeAsync()` when creating HTTP client
+- Tests fail before actual API calls are made
+
+#### Root Cause Analysis
+
+The issue appears to be related to:
+1. **Testcontainers lifecycle**: PostgreSQL and RabbitMQ containers may be disposing the ServiceProvider prematurely
+2. **WebApplicationFactory configuration**: Custom service registration in test setup may conflict with application's DI container
+3. **Async initialization**: Race condition between container startup and service provider initialization
+
+#### What Needs to Be Done
+
+**1. Review WebApplicationFactory Configuration**
+- Examine `AuthControllerIntegrationTests.cs:95` (where error occurs)
+- Check `CustomWebApplicationFactory` or test base class configuration
+- Verify service registration order and lifecycle
+
+**2. Fix Testcontainers Integration**
+- Ensure PostgreSQL container is fully started before WebApplicationFactory initialization
+- Verify RabbitMQ container startup doesn't interfere with DI container
+- Consider using `IAsyncLifetime` pattern for proper async initialization
+
+**3. Update Service Registration in Tests**
+- Review how mock services are registered in test configuration
+- Ensure test services don't dispose the main ServiceProvider
+- Use `ConfigureTestServices()` instead of `ConfigureServices()` if applicable
+
+**4. Add Diagnostics**
+- Add logging to test initialization to identify exact disposal point
+- Verify container health before running tests
+- Add retry logic for container startup if needed
+
+**5. Verify Fix**
+- All 7 integration tests should pass
+- Tests should run reliably (no flakiness)
+- CI/CD pipeline should pass integration test step
+
+#### Acceptance Criteria
+
+- [ ] All integration tests pass (7/7)
+- [ ] Tests run reliably without ServiceProvider disposal errors
+- [ ] WebApplicationFactory initializes successfully
+- [ ] Testcontainers (PostgreSQL, RabbitMQ) start and connect properly
+- [ ] CI/CD pipeline integration test step passes
+- [ ] Documentation updated with any test setup changes
+
+#### References
+
+- Error Location: `src/Services/Identity/DatingApp.IdentityService.Tests.Integration/AuthControllerIntegrationTests.cs:95`
+- Related: WebApplicationFactory docs - https://learn.microsoft.com/en-us/aspnet/core/test/integration-tests
+- Related: Testcontainers .NET - https://dotnet.testcontainers.org/
+- Related PR: #4 (T0002 implementation found this issue)
+
+---
+
 ## P3 - Low Priority
 
 > Future enhancements, optimizations, exploratory work
 
-### 🟡 T0005: Implement Sign In with Apple
+### 🟡 T0006: Implement Sign In with Apple
 
 **Source**: [F0001 - Sign In with Google](docs/40_features/f0001_sign_in_with_google/f0001_sign_in_with_google.md)
 **Status**: 🟡 Ready

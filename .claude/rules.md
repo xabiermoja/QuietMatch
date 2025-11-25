@@ -18,7 +18,7 @@
 - **Working with distributed transactions**: [`docs/20_domain/04_saga-processes.md`](../docs/20_domain/04_saga-processes.md)
 - **Adding authentication/authorization**: [`docs/10_architecture/05_security-and-auth.md`](../docs/10_architecture/05_security-and-auth.md)
 - **Adding messaging/events**: [`docs/10_architecture/06_messaging-and-integration.md`](../docs/10_architecture/06_messaging-and-integration.md)
-- **Implementing a feature**: Find or create a feature file in `docs/40_features/`
+- **Implementing a feature**: Read [`docs/60_operations/feature-workflow.md`](../docs/60_operations/feature-workflow.md) - **⚠️ ALWAYS create a feature branch first, NEVER work on `main`**. Find feature specs in `docs/40_features/`
 - **Local development setup**: [`docs/60_operations/local-dev-setup.md`](../docs/60_operations/local-dev-setup.md)
 - **Azure deployment**: [`docs/10_architecture/07_deployment-and-devops.md`](../docs/10_architecture/07_deployment-and-devops.md)
 

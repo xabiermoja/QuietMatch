@@ -107,4 +107,97 @@ public class AuthController : ControllerBase
             });
         }
     }
+
+    /// <summary>
+    /// Refreshes an expired access token using a valid refresh token.
+    /// </summary>
+    /// <param name="request">Refresh token from client</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>New access token and refresh token</returns>
+    /// <response code="200">Token refresh successful - returns new access token and refresh token</response>
+    /// <response code="400">Invalid request - refresh token is missing or malformed</response>
+    /// <response code="401">Unauthorized - refresh token is invalid, expired, or revoked</response>
+    /// <response code="429">Rate limit exceeded - too many refresh attempts</response>
+    /// <response code="500">Internal server error - service temporarily unavailable</response>
+    /// <remarks>
+    /// Implements OAuth 2.0 Refresh Token Flow (RFC 6749 Section 6).
+    ///
+    /// Token Rotation: This endpoint implements token rotation for security.
+    /// Each successful refresh returns a NEW refresh token and revokes the old one.
+    /// The client must store the new refresh token and discard the old one.
+    ///
+    /// Error Handling:
+    /// - 401 Unauthorized: Token is invalid, expired, or already used (rotated)
+    /// - Clients should redirect to login page when receiving 401
+    /// </remarks>
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> RefreshToken(
+        [FromBody] RefreshTokenRequest request,
+        CancellationToken ct)
+    {
+        // Input validation
+        var validator = new RefreshTokenRequestValidator();
+        var validationResult = await validator.ValidateAsync(request, ct);
+
+        if (!validationResult.IsValid)
+        {
+            _logger.LogWarning(
+                "Refresh token request validation failed: {Errors}",
+                string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+
+            return BadRequest(new ProblemDetails
+            {
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+                Title = "Invalid Request",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage)),
+                Instance = HttpContext.Request.Path
+            });
+        }
+
+        try
+        {
+            // Process refresh token
+            var response = await _authService.RefreshTokenAsync(request.RefreshToken, ct);
+
+            if (response is null)
+            {
+                // Refresh token validation failed (invalid, expired, or revoked)
+                _logger.LogWarning("Refresh token validation failed");
+
+                return Unauthorized(new ProblemDetails
+                {
+                    Type = "https://tools.ietf.org/html/rfc7235#section-3.1",
+                    Title = "Invalid Refresh Token",
+                    Status = StatusCodes.Status401Unauthorized,
+                    Detail = "The provided refresh token is invalid, expired, or has been revoked. Please sign in again.",
+                    Instance = HttpContext.Request.Path
+                });
+            }
+
+            // Success
+            _logger.LogInformation("Token refresh successful");
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            // Unexpected error (database down, etc.)
+            _logger.LogError(ex, "Error during token refresh");
+
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
+                Title = "Token Refresh Service Unavailable",
+                Status = StatusCodes.Status500InternalServerError,
+                Detail = "Unable to refresh your access token. Please try again later.",
+                Instance = HttpContext.Request.Path
+            });
+        }
+    }
 }
