@@ -250,4 +250,103 @@ public class AuthService
             TokenType: "Bearer"
         );
     }
+
+    /// <summary>
+    /// Revokes a refresh token, making it unusable for future refresh operations.
+    /// </summary>
+    /// <param name="refreshToken">The refresh token to revoke</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>True if token was revoked, false if token not found</returns>
+    /// <remarks>
+    /// Implements RFC 7009 - OAuth 2.0 Token Revocation.
+    ///
+    /// Idempotent Operation:
+    /// - If token doesn't exist: returns true (no-op, considered success)
+    /// - If token already revoked: returns true (no-op, already in desired state)
+    /// - If token is valid: revokes it and returns true
+    ///
+    /// Use Cases:
+    /// - User explicitly logs out from a specific device
+    /// - User revokes access from security settings
+    /// - Security incident requires token invalidation
+    /// </remarks>
+    public async Task<bool> RevokeTokenAsync(string refreshToken, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Processing token revocation request");
+
+        // 1. Hash the incoming refresh token
+        var tokenHash = _jwtTokenGenerator.HashToken(refreshToken);
+
+        // 2. Find token in database
+        var storedToken = await _refreshTokenRepository.GetByTokenHashAsync(tokenHash, ct);
+
+        if (storedToken is null)
+        {
+            _logger.LogInformation("Token not found in database - treating as already revoked (idempotent)");
+            return true; // Idempotent: token doesn't exist = already "revoked"
+        }
+
+        // 3. If already revoked, return success (idempotent)
+        if (storedToken.IsRevoked)
+        {
+            _logger.LogInformation(
+                "Token already revoked - TokenId={TokenId}, RevokedAt={RevokedAt} (idempotent)",
+                storedToken.Id,
+                storedToken.RevokedAt);
+            return true;
+        }
+
+        // 4. Revoke the token
+        storedToken.Revoke();
+        await _refreshTokenRepository.UpdateAsync(storedToken, ct);
+
+        _logger.LogInformation(
+            "Token revoked successfully - TokenId={TokenId}, UserId={UserId}",
+            storedToken.Id,
+            storedToken.UserId);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Revokes all active refresh tokens for a user (logout from all devices).
+    /// </summary>
+    /// <param name="userId">The user's unique ID</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Number of tokens revoked</returns>
+    /// <remarks>
+    /// Use Cases:
+    /// - User clicks "Logout from all devices" in security settings
+    /// - Security incident requires invalidating all user sessions
+    /// - Password reset should invalidate all existing tokens
+    ///
+    /// Implementation:
+    /// - Uses repository method to revoke all tokens in one transaction
+    /// - Only revokes active (non-revoked, non-expired) tokens
+    /// - Returns count of tokens actually revoked
+    /// </remarks>
+    public async Task<int> RevokeAllTokensForUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Revoking all tokens for UserId={UserId}", userId);
+
+        // Get all active tokens before revoking
+        var activeTokens = await _refreshTokenRepository.GetActiveByUserIdAsync(userId, ct);
+        var tokenCount = activeTokens.Count();
+
+        if (tokenCount == 0)
+        {
+            _logger.LogInformation("No active tokens found for UserId={UserId}", userId);
+            return 0;
+        }
+
+        // Revoke all active tokens
+        await _refreshTokenRepository.RevokeAllByUserIdAsync(userId, ct);
+
+        _logger.LogInformation(
+            "Revoked {TokenCount} tokens for UserId={UserId}",
+            tokenCount,
+            userId);
+
+        return tokenCount;
+    }
 }

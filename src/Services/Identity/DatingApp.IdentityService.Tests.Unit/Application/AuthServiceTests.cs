@@ -564,4 +564,218 @@ public class AuthServiceTests
     }
 
     #endregion
+
+    #region RevokeTokenAsync Tests
+
+    [Fact]
+    public async Task RevokeTokenAsync_WithValidToken_ShouldRevokeTokenAndReturnTrue()
+    {
+        // Arrange
+        var plainTextRefreshToken = "valid-refresh-token";
+        var refreshTokenHash = "hashed-refresh-token";
+        var userId = Guid.NewGuid();
+        var validToken = RefreshToken.Create(userId, refreshTokenHash, validityDays: 7);
+
+        _mockJwtTokenGenerator
+            .Setup(x => x.HashToken(plainTextRefreshToken))
+            .Returns(refreshTokenHash);
+
+        _mockRefreshTokenRepository
+            .Setup(x => x.GetByTokenHashAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(validToken);
+
+        // Act
+        var result = await _authService.RevokeTokenAsync(plainTextRefreshToken);
+
+        // Assert
+        result.Should().BeTrue("Valid token should be revoked successfully");
+        validToken.IsRevoked.Should().BeTrue("Token should be marked as revoked");
+        validToken.RevokedAt.Should().NotBeNull("RevokedAt should be set");
+
+        // Verify token was updated in database
+        _mockRefreshTokenRepository.Verify(
+            x => x.UpdateAsync(It.Is<RefreshToken>(rt =>
+                rt.IsRevoked == true &&
+                rt.RevokedAt != null
+            ), It.IsAny<CancellationToken>()),
+            Times.Once,
+            "Token should be updated with revoked status"
+        );
+    }
+
+    [Fact]
+    public async Task RevokeTokenAsync_WithNonExistentToken_ShouldBeIdempotentAndReturnTrue()
+    {
+        // Arrange
+        var plainTextRefreshToken = "non-existent-token";
+        var refreshTokenHash = "hashed-non-existent-token";
+
+        _mockJwtTokenGenerator
+            .Setup(x => x.HashToken(plainTextRefreshToken))
+            .Returns(refreshTokenHash);
+
+        _mockRefreshTokenRepository
+            .Setup(x => x.GetByTokenHashAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RefreshToken?)null); // Token not found
+
+        // Act
+        var result = await _authService.RevokeTokenAsync(plainTextRefreshToken);
+
+        // Assert
+        result.Should().BeTrue("Non-existent token should be treated as already revoked (idempotent)");
+
+        // Verify no database updates occurred
+        _mockRefreshTokenRepository.Verify(
+            x => x.UpdateAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()),
+            Times.Never,
+            "No update should occur for non-existent token"
+        );
+    }
+
+    [Fact]
+    public async Task RevokeTokenAsync_WithAlreadyRevokedToken_ShouldBeIdempotentAndReturnTrue()
+    {
+        // Arrange
+        var plainTextRefreshToken = "already-revoked-token";
+        var refreshTokenHash = "hashed-revoked-token";
+        var userId = Guid.NewGuid();
+        var revokedToken = RefreshToken.Create(userId, refreshTokenHash, validityDays: 7);
+        revokedToken.Revoke(); // Already revoked
+
+        _mockJwtTokenGenerator
+            .Setup(x => x.HashToken(plainTextRefreshToken))
+            .Returns(refreshTokenHash);
+
+        _mockRefreshTokenRepository
+            .Setup(x => x.GetByTokenHashAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(revokedToken);
+
+        // Act
+        var result = await _authService.RevokeTokenAsync(plainTextRefreshToken);
+
+        // Assert
+        result.Should().BeTrue("Already-revoked token should return success (idempotent)");
+
+        // Verify no database updates occurred (token is already revoked)
+        _mockRefreshTokenRepository.Verify(
+            x => x.UpdateAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()),
+            Times.Never,
+            "No update should occur for already-revoked token"
+        );
+    }
+
+    [Fact]
+    public async Task RevokeTokenAsync_ShouldHashIncomingTokenForLookup()
+    {
+        // Arrange
+        var plainTextRefreshToken = "plain-text-token";
+        var refreshTokenHash = "expected-hash";
+
+        _mockJwtTokenGenerator
+            .Setup(x => x.HashToken(plainTextRefreshToken))
+            .Returns(refreshTokenHash);
+
+        _mockRefreshTokenRepository
+            .Setup(x => x.GetByTokenHashAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((RefreshToken?)null);
+
+        // Act
+        await _authService.RevokeTokenAsync(plainTextRefreshToken);
+
+        // Assert
+        _mockJwtTokenGenerator.Verify(
+            x => x.HashToken(plainTextRefreshToken),
+            Times.Once,
+            "Incoming refresh token must be hashed before database lookup"
+        );
+
+        _mockRefreshTokenRepository.Verify(
+            x => x.GetByTokenHashAsync(refreshTokenHash, It.IsAny<CancellationToken>()),
+            Times.Once,
+            "Should look up token by its hash"
+        );
+    }
+
+    #endregion
+
+    #region RevokeAllTokensForUserAsync Tests
+
+    [Fact]
+    public async Task RevokeAllTokensForUserAsync_WithActiveTokens_ShouldRevokeAllAndReturnCount()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var token1 = RefreshToken.Create(userId, "hash1", validityDays: 7);
+        var token2 = RefreshToken.Create(userId, "hash2", validityDays: 7);
+        var token3 = RefreshToken.Create(userId, "hash3", validityDays: 7);
+        var activeTokens = new List<RefreshToken> { token1, token2, token3 };
+
+        _mockRefreshTokenRepository
+            .Setup(x => x.GetActiveByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(activeTokens);
+
+        // Act
+        var result = await _authService.RevokeAllTokensForUserAsync(userId);
+
+        // Assert
+        result.Should().Be(3, "Should return count of revoked tokens");
+
+        // Verify RevokeAllByUserIdAsync was called
+        _mockRefreshTokenRepository.Verify(
+            x => x.RevokeAllByUserIdAsync(userId, It.IsAny<CancellationToken>()),
+            Times.Once,
+            "Should revoke all tokens for the user"
+        );
+    }
+
+    [Fact]
+    public async Task RevokeAllTokensForUserAsync_WithNoActiveTokens_ShouldReturnZero()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var emptyTokenList = new List<RefreshToken>();
+
+        _mockRefreshTokenRepository
+            .Setup(x => x.GetActiveByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(emptyTokenList);
+
+        // Act
+        var result = await _authService.RevokeAllTokensForUserAsync(userId);
+
+        // Assert
+        result.Should().Be(0, "Should return 0 when no active tokens exist");
+
+        // Verify RevokeAllByUserIdAsync was NOT called (optimization)
+        _mockRefreshTokenRepository.Verify(
+            x => x.RevokeAllByUserIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()),
+            Times.Never,
+            "Should not attempt to revoke when no active tokens exist"
+        );
+    }
+
+    [Fact]
+    public async Task RevokeAllTokensForUserAsync_WithSingleToken_ShouldRevokeAndReturnOne()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var token = RefreshToken.Create(userId, "hash1", validityDays: 7);
+        var activeTokens = new List<RefreshToken> { token };
+
+        _mockRefreshTokenRepository
+            .Setup(x => x.GetActiveByUserIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(activeTokens);
+
+        // Act
+        var result = await _authService.RevokeAllTokensForUserAsync(userId);
+
+        // Assert
+        result.Should().Be(1, "Should return 1 when single token is revoked");
+
+        _mockRefreshTokenRepository.Verify(
+            x => x.RevokeAllByUserIdAsync(userId, It.IsAny<CancellationToken>()),
+            Times.Once
+        );
+    }
+
+    #endregion
 }
