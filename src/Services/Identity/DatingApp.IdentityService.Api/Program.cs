@@ -4,8 +4,10 @@ using DatingApp.IdentityService.Domain.Repositories;
 using DatingApp.IdentityService.Infrastructure.Data;
 using DatingApp.IdentityService.Infrastructure.Repositories;
 using DatingApp.IdentityService.Infrastructure.Services;
+using HealthChecks.UI.Client;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -87,6 +89,16 @@ builder.Services.AddAuthorization();
 // Controllers
 builder.Services.AddControllers();
 
+// Health Checks
+builder.Services.AddHealthChecks()
+    .AddNpgSql(
+        connectionString: builder.Configuration.GetConnectionString("IdentityDb")!,
+        name: "postgres",
+        tags: new[] { "db", "ready" })
+    .AddRabbitMQ(
+        name: "rabbitmq",
+        tags: new[] { "messagebus", "ready" });
+
 // Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -126,6 +138,33 @@ app.UseAuthorization();
 
 // Map controllers
 app.MapControllers();
+
+// Map health check endpoints
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = _ => true,
+    ResponseWriter = (context, report) =>
+    {
+        context.Response.ContentType = "text/plain";
+        return context.Response.WriteAsync(report.Status.ToString());
+    }
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = (context, report) =>
+    {
+        context.Response.ContentType = "text/plain";
+        return context.Response.WriteAsync(report.Status.ToString());
+    }
+});
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => true,
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
 
 try
 {
