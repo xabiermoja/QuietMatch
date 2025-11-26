@@ -1,7 +1,9 @@
 using DatingApp.IdentityService.Application.DTOs;
 using DatingApp.IdentityService.Application.Services;
 using DatingApp.IdentityService.Application.Validators;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace DatingApp.IdentityService.Api.Controllers;
 
@@ -196,6 +198,161 @@ public class AuthController : ControllerBase
                 Title = "Token Refresh Service Unavailable",
                 Status = StatusCodes.Status500InternalServerError,
                 Detail = "Unable to refresh your access token. Please try again later.",
+                Instance = HttpContext.Request.Path
+            });
+        }
+    }
+
+    /// <summary>
+    /// Revokes a refresh token, making it unusable for future refresh operations.
+    /// </summary>
+    /// <param name="request">Token revocation request</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>204 No Content on success</returns>
+    /// <response code="204">Token revoked successfully (or already revoked - idempotent)</response>
+    /// <response code="400">Invalid request - refresh token is missing or malformed</response>
+    /// <response code="500">Internal server error - service temporarily unavailable</response>
+    /// <remarks>
+    /// Implements RFC 7009 - OAuth 2.0 Token Revocation.
+    ///
+    /// Idempotent Operation:
+    /// - Returns 204 even if token doesn't exist (already revoked)
+    /// - Returns 204 even if token is already revoked
+    /// - This is intentional for security (don't leak token existence)
+    ///
+    /// Use Cases:
+    /// - User logs out from a specific device
+    /// - User revokes access from security settings
+    /// - Security incident requires token invalidation
+    /// </remarks>
+    [HttpPost("revoke")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> RevokeToken(
+        [FromBody] RevokeTokenRequest request,
+        CancellationToken ct)
+    {
+        // Input validation
+        var validator = new RevokeTokenRequestValidator();
+        var validationResult = await validator.ValidateAsync(request, ct);
+
+        if (!validationResult.IsValid)
+        {
+            _logger.LogWarning(
+                "Revoke token request validation failed: {Errors}",
+                string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+
+            return BadRequest(new ProblemDetails
+            {
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+                Title = "Invalid Request",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage)),
+                Instance = HttpContext.Request.Path
+            });
+        }
+
+        try
+        {
+            // Revoke the token (idempotent operation)
+            await _authService.RevokeTokenAsync(request.RefreshToken, ct);
+
+            _logger.LogInformation("Token revocation successful");
+
+            // 204 No Content - idempotent, don't leak whether token existed
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during token revocation");
+
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
+                Title = "Token Revocation Service Unavailable",
+                Status = StatusCodes.Status500InternalServerError,
+                Detail = "Unable to revoke your token. Please try again later.",
+                Instance = HttpContext.Request.Path
+            });
+        }
+    }
+
+    /// <summary>
+    /// Logs out the user by revoking all their refresh tokens (all devices).
+    /// </summary>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>200 OK with count of revoked tokens</returns>
+    /// <response code="200">Logout successful - returns count of revoked tokens</response>
+    /// <response code="401">Unauthorized - invalid or missing JWT access token</response>
+    /// <response code="500">Internal server error - service temporarily unavailable</response>
+    /// <remarks>
+    /// Requires valid JWT access token in Authorization header.
+    ///
+    /// This endpoint revokes ALL refresh tokens for the authenticated user,
+    /// effectively logging them out from all devices.
+    ///
+    /// Authorization Header:
+    /// ```
+    /// Authorization: Bearer {your-access-token}
+    /// ```
+    ///
+    /// Security Note:
+    /// - Access token remains valid until expiry (15 minutes)
+    /// - Client should discard access token and refresh token immediately
+    /// - User cannot refresh access token after logout (all refresh tokens revoked)
+    /// </remarks>
+    [HttpPost("logout")]
+    [Authorize] // Requires valid JWT access token
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Logout(CancellationToken ct)
+    {
+        try
+        {
+            // Extract userId from JWT claims
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                _logger.LogWarning("Invalid or missing userId in JWT claims");
+
+                return Unauthorized(new ProblemDetails
+                {
+                    Type = "https://tools.ietf.org/html/rfc7235#section-3.1",
+                    Title = "Invalid Token",
+                    Status = StatusCodes.Status401Unauthorized,
+                    Detail = "Your access token is invalid or malformed.",
+                    Instance = HttpContext.Request.Path
+                });
+            }
+
+            // Revoke all tokens for the user
+            var revokedCount = await _authService.RevokeAllTokensForUserAsync(userId, ct);
+
+            _logger.LogInformation(
+                "User logged out successfully - UserId={UserId}, TokensRevoked={TokensRevoked}",
+                userId,
+                revokedCount);
+
+            return Ok(new
+            {
+                message = "Logged out successfully from all devices",
+                tokensRevoked = revokedCount
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during logout");
+
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
+                Title = "Logout Service Unavailable",
+                Status = StatusCodes.Status500InternalServerError,
+                Detail = "Unable to complete logout. Please try again later.",
                 Instance = HttpContext.Request.Path
             });
         }
