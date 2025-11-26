@@ -34,12 +34,14 @@ public class AuthController : ControllerBase
     /// <param name="ct">Cancellation token</param>
     /// <returns>Login response with JWT tokens and user info</returns>
     /// <response code="200">Authentication successful - returns access token, refresh token, and user info</response>
-    /// <response code="400">Invalid request - ID token is missing, malformed, or invalid</response>
+    /// <response code="400">Invalid request - ID token is missing or malformed</response>
+    /// <response code="401">Unauthorized - ID token is invalid or expired</response>
     /// <response code="429">Rate limit exceeded - too many login attempts</response>
     /// <response code="500">Internal server error - service temporarily unavailable</response>
     [HttpPost("login/google")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> LoginWithGoogle(
@@ -76,11 +78,11 @@ public class AuthController : ControllerBase
                 // Google token validation failed
                 _logger.LogWarning("Google ID token validation failed");
 
-                return BadRequest(new ProblemDetails
+                return Unauthorized(new ProblemDetails
                 {
-                    Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+                    Type = "https://tools.ietf.org/html/rfc7235#section-3.1",
                     Title = "Invalid ID Token",
-                    Status = StatusCodes.Status400BadRequest,
+                    Status = StatusCodes.Status401Unauthorized,
                     Detail = "The provided ID token is invalid or expired.",
                     Instance = HttpContext.Request.Path
                 });

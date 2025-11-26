@@ -253,9 +253,11 @@ public class AuthControllerIntegrationTests : IAsyncLifetime
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
-        // Should return ProblemDetails
+        // Should return ProblemDetails with validation error
         var problemDetails = await response.Content.ReadFromJsonAsync<JsonElement>();
-        problemDetails.GetProperty("type").GetString().Should().Contain("validation");
+        problemDetails.GetProperty("type").GetString().Should().NotBeNullOrWhiteSpace();
+        problemDetails.GetProperty("status").GetInt32().Should().Be(400);
+        problemDetails.GetProperty("detail").GetString().Should().Contain("ID token is required");
     }
 
     [Fact]
