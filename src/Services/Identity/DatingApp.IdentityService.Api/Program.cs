@@ -40,9 +40,18 @@ builder.Services.AddScoped<AuthService>();
 // MassTransit (Message Bus)
 builder.Services.AddMassTransit(x =>
 {
-    // Configure RabbitMQ for local development
-    if (builder.Environment.IsDevelopment())
+    // Configure transport based on environment
+    if (builder.Environment.IsEnvironment("Testing"))
     {
+        // Use in-memory transport for integration tests
+        x.UsingInMemory((context, cfg) =>
+        {
+            cfg.ConfigureEndpoints(context);
+        });
+    }
+    else if (builder.Environment.IsDevelopment())
+    {
+        // Configure RabbitMQ for local development
         x.UsingRabbitMq((context, cfg) =>
         {
             cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
