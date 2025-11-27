@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.ProfileService.Core", "DatingApp.ProfileService.Core\DatingApp.ProfileService.Core.csproj", "{44858E08-1FFD-4A67-BAD5-4F195F90DAB5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.ProfileService.Infrastructure", "DatingApp.ProfileService.Infrastructure\DatingApp.ProfileService.Infrastructure.csproj", "{3CF20307-E781-48D1-B60C-98C0D83F151F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.ProfileService.Api", "DatingApp.ProfileService.Api\DatingApp.ProfileService.Api.csproj", "{804C8404-3460-470A-A109-CB078DFFFB4A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.ProfileService.Tests.Unit", "DatingApp.ProfileService.Tests.Unit\DatingApp.ProfileService.Tests.Unit.csproj", "{220AFA4E-3B11-423D-96BA-F1FC07752013}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.ProfileService.Tests.Integration", "DatingApp.ProfileService.Tests.Integration\DatingApp.ProfileService.Tests.Integration.csproj", "{DC50921A-BC68-45DE-82FA-44E66BADCEB2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{44858E08-1FFD-4A67-BAD5-4F195F90DAB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44858E08-1FFD-4A67-BAD5-4F195F90DAB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44858E08-1FFD-4A67-BAD5-4F195F90DAB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44858E08-1FFD-4A67-BAD5-4F195F90DAB5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3CF20307-E781-48D1-B60C-98C0D83F151F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3CF20307-E781-48D1-B60C-98C0D83F151F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3CF20307-E781-48D1-B60C-98C0D83F151F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3CF20307-E781-48D1-B60C-98C0D83F151F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{804C8404-3460-470A-A109-CB078DFFFB4A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{804C8404-3460-470A-A109-CB078DFFFB4A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{804C8404-3460-470A-A109-CB078DFFFB4A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{804C8404-3460-470A-A109-CB078DFFFB4A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{220AFA4E-3B11-423D-96BA-F1FC07752013}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{220AFA4E-3B11-423D-96BA-F1FC07752013}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{220AFA4E-3B11-423D-96BA-F1FC07752013}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{220AFA4E-3B11-423D-96BA-F1FC07752013}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DC50921A-BC68-45DE-82FA-44E66BADCEB2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC50921A-BC68-45DE-82FA-44E66BADCEB2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DC50921A-BC68-45DE-82FA-44E66BADCEB2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DC50921A-BC68-45DE-82FA-44E66BADCEB2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
