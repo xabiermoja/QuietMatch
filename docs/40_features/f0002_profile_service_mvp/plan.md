@@ -4,8 +4,13 @@
 **Feature File**: [f0002_profile_service_mvp.md](./f0002_profile_service_mvp.md)
 **Architecture Pattern**: Onion Architecture (ProfileService)
 **Started**: TBD
-**Last Updated**: 2025-11-26
+**Last Updated**: 2025-11-27
 **Estimated Total Time**: 20-24 hours
+
+**🔐 Encryption Update**: Enhanced encryption coverage for GDPR compliance:
+- **5 encrypted fields**: FullName, Email, DateOfBirth, LocationLatitude, LocationLongitude
+- **Rationale**: All direct PII identifiers must be encrypted at rest per GDPR Article 32
+- **Implementation**: EF Core value converters (transparent encryption at persistence layer)
 
 ---
 
@@ -296,10 +301,11 @@ This plan provides a detailed, smart implementation roadmap for F0002 (ProfileSe
   - **Location**: `Core/Domain/Entities/MemberProfile.cs`
   - **Properties**:
     - UserId (MemberId) - Primary key
+    - Email (string) - Will be encrypted via Infrastructure (from UserRegistered event)
     - FullName (string) - Will be encrypted via Infrastructure
-    - DateOfBirth (DateTime)
+    - DateOfBirth (DateTime) - Will be encrypted via Infrastructure
     - Gender (string)
-    - Location (Location value object)
+    - Location (Location value object) - Latitude/Longitude will be encrypted
     - Personality (PersonalityProfile value object)
     - Values (Values value object)
     - Lifestyle (Lifestyle value object)
@@ -437,7 +443,12 @@ This plan provides a detailed, smart implementation roadmap for F0002 (ProfileSe
   - **Configuration**:
     - Table name: `member_profiles`
     - Primary key: UserId (Guid)
-    - FullName: Use `EncryptedStringConverter` for transparent encryption
+    - **Encrypted fields** (via value converters):
+      - FullName: Use `EncryptedStringConverter`
+      - Email: Use `EncryptedStringConverter`
+      - DateOfBirth: Use `EncryptedDateTimeConverter`
+      - LocationLatitude: Use `EncryptedDecimalConverter`
+      - LocationLongitude: Use `EncryptedDecimalConverter`
     - PersonalityProfile: Owned entity (same table)
     - Values: Owned entity (same table)
     - Lifestyle: Owned entity (same table)
@@ -445,7 +456,7 @@ This plan provides a detailed, smart implementation roadmap for F0002 (ProfileSe
     - PreferredLanguages: JSON column
     - Indexes: DeletedAt (filtered), IsComplete
     - Check constraints: Age range validation
-  - **Why**: Configure EF Core mapping, apply encryption converter
+  - **Why**: Configure EF Core mapping, apply encryption converters for GDPR-sensitive PII
   - **Reference**: [Feature Spec - Database Schema](./f0002_profile_service_mvp.md)
   - **Reference**: [Security & Auth - Field-Level Encryption](../../10_architecture/05_security-and-auth.md)
 
@@ -456,15 +467,20 @@ This plan provides a detailed, smart implementation roadmap for F0002 (ProfileSe
   - **Implements**: `IEncryptionService` (domain port)
   - **Algorithm**: AES-256-CBC
   - **Key Source**: Read from environment variable (ENCRYPTION_KEY)
-  - **Why**: Provides field-level encryption for FullName
+  - **Why**: Provides field-level encryption for PII (FullName, Email, DateOfBirth, Latitude, Longitude)
   - **Security**: Key stored in Azure Key Vault in production
   - **Reference**: [Security & Auth - Encryption](../../10_architecture/05_security-and-auth.md)
 
-- [ ] Create `EncryptedStringConverter` (EF Core value converter)
-  - **Location**: `Infrastructure/Security/EncryptedStringConverter.cs`
-  - **Purpose**: Transparently encrypt/decrypt FullName during save/load
+- [ ] Create EF Core value converters for transparent encryption
+  - **EncryptedStringConverter** (`Infrastructure/Security/EncryptedStringConverter.cs`)
+    - For: FullName, Email
+  - **EncryptedDateTimeConverter** (`Infrastructure/Security/EncryptedDateTimeConverter.cs`)
+    - For: DateOfBirth
+  - **EncryptedDecimalConverter** (`Infrastructure/Security/EncryptedDecimalConverter.cs`)
+    - For: LocationLatitude, LocationLongitude
+  - **Purpose**: Transparently encrypt/decrypt during save/load
   - **Usage**: Apply in `MemberProfileConfiguration`
-  - **Why**: Encryption happens automatically at persistence layer
+  - **Why**: Encryption happens automatically at persistence layer, domain stays pure
 
 ### Create Repository Implementations (Adapters)
 
@@ -631,10 +647,17 @@ This plan provides a detailed, smart implementation roadmap for F0002 (ProfileSe
   - AddAsync persists to real PostgreSQL
   - GetByUserIdAsync retrieves from database
   - UpdateAsync saves changes
-  - Encryption/decryption works correctly (FullName encrypted in DB, decrypted on read)
+  - **Encryption/decryption works correctly for all 5 encrypted fields**:
+    - FullName encrypted/decrypted
+    - Email encrypted/decrypted
+    - DateOfBirth encrypted/decrypted
+    - LocationLatitude encrypted/decrypted
+    - LocationLongitude encrypted/decrypted
+  - Verify encrypted values in DB are unreadable (inspect raw DB)
 
 - [ ] Test UserRegisteredConsumer:
   - Consumes UserRegistered event and creates profile skeleton
+  - Email field populated and encrypted
   - Publishes ProfileCreated event
 
 - [ ] **Tool**: Testcontainers.PostgreSql, Testcontainers.RabbitMq
@@ -657,8 +680,14 @@ This plan provides a detailed, smart implementation roadmap for F0002 (ProfileSe
 ### Manual Testing Checklist
 
 - [ ] Use Postman/Insomnia to test full CRUD flow
-- [ ] Verify FullName encrypted in database (inspect via psql)
-- [ ] Verify UserRegistered event triggers profile creation
+- [ ] **Verify encryption in database** (inspect via psql):
+  - FullName is encrypted (unreadable ciphertext)
+  - Email is encrypted
+  - DateOfBirth is encrypted
+  - LocationLatitude is encrypted
+  - LocationLongitude is encrypted
+- [ ] Verify API responses show decrypted values correctly
+- [ ] Verify UserRegistered event triggers profile creation with encrypted email
 - [ ] Verify ProfileCompleted event published when reaching 100%
 - [ ] Check RabbitMQ management UI for events
 - [ ] Check Seq logs for correlation IDs
@@ -734,7 +763,12 @@ Before marking feature as complete:
 - [ ] No hardcoded values (all in config)
 - [ ] Security requirements met (JWT, encryption, authorization)
 - [ ] GDPR requirements met (soft delete, right to access/rectification/erasure)
-- [ ] FullName encrypted at rest
+- [ ] **All 5 PII fields encrypted at rest**:
+  - [ ] FullName encrypted
+  - [ ] Email encrypted
+  - [ ] DateOfBirth encrypted
+  - [ ] LocationLatitude encrypted
+  - [ ] LocationLongitude encrypted
 - [ ] UserRegistered event consumed correctly
 - [ ] ProfileCreated, ProfileUpdated, ProfileCompleted events published
 - [ ] Health checks working
