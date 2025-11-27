@@ -229,7 +229,7 @@ public class ProfileService : IProfileService
             FullName = profile.FullName,
             DateOfBirth = profile.DateOfBirth,
             Gender = profile.Gender,
-            Location = new LocationDto
+            Location = profile.Location == null ? null! : new LocationDto
             {
                 City = profile.Location.City,
                 Country = profile.Location.Country,
