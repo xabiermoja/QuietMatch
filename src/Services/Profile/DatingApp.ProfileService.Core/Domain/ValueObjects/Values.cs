@@ -33,6 +33,9 @@ public record Values
     public int FinancialSecurity { get; init; }
     public int Environmentalism { get; init; }
 
+    // Private constructor for EF Core
+    private Values() { }
+
     public Values(
         int familyOrientation,
         int careerAmbition,

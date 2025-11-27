@@ -20,6 +20,9 @@ public record Lifestyle
     public bool HasPets { get; init; }
     public ChildrenPreference WantsChildren { get; init; }
 
+    // Private constructor for EF Core
+    private Lifestyle() { }
+
     public Lifestyle(
         ExerciseFrequency exerciseFrequency,
         DietType dietType,

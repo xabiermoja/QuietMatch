@@ -16,13 +16,20 @@ namespace DatingApp.ProfileService.Core.Domain.ValueObjects;
 /// </remarks>
 public record PreferenceSet
 {
-    private const int MinDistanceKm = 1;
-    private const int MaxDistanceKm = 500;
+    private const int MinDistanceLimit = 1;
+    private const int MaxDistanceLimit = 500;
 
     public AgeRange PreferredAgeRange { get; init; }
     public int MaxDistanceKm { get; init; }
     public List<string> PreferredLanguages { get; init; }
     public GenderPreference GenderPreference { get; init; }
+
+    // Private constructor for EF Core
+    private PreferenceSet()
+    {
+        PreferredAgeRange = null!;
+        PreferredLanguages = new List<string>();
+    }
 
     public PreferenceSet(
         AgeRange preferredAgeRange,
@@ -34,8 +41,8 @@ public record PreferenceSet
         PreferredAgeRange = preferredAgeRange ?? throw new ArgumentNullException(nameof(preferredAgeRange));
 
         // Validate distance
-        if (maxDistanceKm < MinDistanceKm || maxDistanceKm > MaxDistanceKm)
-            throw new ProfileDomainException($"MaxDistanceKm must be between {MinDistanceKm} and {MaxDistanceKm} (received: {maxDistanceKm})");
+        if (maxDistanceKm < MinDistanceLimit || maxDistanceKm > MaxDistanceLimit)
+            throw new ProfileDomainException($"MaxDistanceKm must be between {MinDistanceLimit} and {MaxDistanceLimit} (received: {maxDistanceKm})");
 
         // Validate languages
         if (preferredLanguages == null || preferredLanguages.Count == 0)

@@ -32,6 +32,9 @@ public record PersonalityProfile
     public string? AboutMe { get; init; }
     public string? LifePhilosophy { get; init; }
 
+    // Private constructor for EF Core
+    private PersonalityProfile() { }
+
     public PersonalityProfile(
         int openness,
         int conscientiousness,

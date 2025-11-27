@@ -19,6 +19,9 @@ public record AgeRange
     public int Min { get; init; }
     public int Max { get; init; }
 
+    // Private constructor for EF Core
+    private AgeRange() { }
+
     public AgeRange(int min, int max)
     {
         // Validate minimum age

@@ -55,13 +55,12 @@ public class ProfileService : IProfileService
         }
 
         // Convert DTO to value object
-        var location = new Location
-        {
-            City = request.Location.City,
-            Country = request.Location.Country,
-            Latitude = request.Location.Latitude,
-            Longitude = request.Location.Longitude
-        };
+        var location = new Location(
+            request.Location.City,
+            request.Location.Country,
+            request.Location.Latitude,
+            request.Location.Longitude
+        );
 
         // Call domain method (business logic)
         profile.UpdateBasicInfo(request.FullName, request.DateOfBirth, request.Gender, location);
