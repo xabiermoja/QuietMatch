@@ -128,37 +128,33 @@ services:
   #   networks:
   #     - quietmatch-network
 
-  # profile-service:
-  #   build:
-  #     context: .
-  #     dockerfile: src/Services/Profile/Dockerfile
-  #   container_name: quietmatch-profile
-  #   restart: unless-stopped
-  #   ports:
-  #     - "5002:8080"
-  #   environment:
-  #     - ASPNETCORE_ENVIRONMENT=Development
-  #     - ASPNETCORE_URLS=http://+:8080
-  #     - ConnectionStrings__ProfileDb=Host=postgres;Port=5432;Database=profile_db;Username=admin;Password=QuietMatch_Dev_2025!
-  #     - Redis__ConnectionString=redis:6379
-  #     - MessageBroker__Host=rabbitmq
-  #     - MessageBroker__Port=5672
-  #     - MessageBroker__Username=guest
-  #     - MessageBroker__Password=guest
-  #     - Jwt__Issuer=https://quietmatch.local
-  #     - Jwt__Audience=https://api.quietmatch.local
-  #     - Jwt__SecretKey=ThisIsASecretKeyForLocalDevelopmentOnly_ChangeInProduction_32BytesMinimum!
-  #     - EncryptionKey=AnotherSecretKeyForFieldLevelEncryption_32BytesMinimum_ChangeInProd!
-  #     - Serilog__SeqUrl=http://seq:5341
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     rabbitmq:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   networks:
-  #     - quietmatch-network
+  profile-service:
+    build:
+      context: .
+      dockerfile: src/Services/Profile/Dockerfile
+    container_name: quietmatch-profile
+    restart: unless-stopped
+    ports:
+      - "5002:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__ProfileDb=Host=postgres;Port=5432;Database=profile_db;Username=admin;Password=QuietMatch_Dev_2025!
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - Jwt__Issuer=DatingApp.IdentityService
+      - Jwt__Audience=DatingApp.ProfileService
+      - Jwt__Secret=ThisIsASecretKeyForLocalDevelopmentOnly_ChangeInProduction_32BytesMinimum!
+      - Encryption__Key=dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleTE=
+      - Seq__Url=http://seq:80
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - quietmatch-network
 
   # matching-service:
   #   build:
