@@ -33,17 +33,17 @@ public record Recipient
     /// <exception cref="ArgumentException">Thrown when validation fails</exception>
     public Recipient(string email, string name)
     {
-        if (string.IsNullOrWhiteSpace(email))
+        // Trim email first, THEN validate
+        var trimmedEmail = email?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(trimmedEmail))
             throw new ArgumentException("Email is required", nameof(email));
 
-        if (!EmailRegex.IsMatch(email))
-            throw new ArgumentException($"Invalid email format: {email}", nameof(email));
+        if (!EmailRegex.IsMatch(trimmedEmail))
+            throw new ArgumentException($"Invalid email format: {trimmedEmail}", nameof(email));
 
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("Name is required", nameof(name));
-
-        Email = email.Trim().ToLowerInvariant();
-        Name = name.Trim();
+        Email = trimmedEmail.ToLowerInvariant();
+        Name = name?.Trim() ?? string.Empty; // Allow empty names
     }
 
     /// <summary>
