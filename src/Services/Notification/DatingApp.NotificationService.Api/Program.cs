@@ -4,6 +4,8 @@ using DatingApp.NotificationService.Infrastructure.Adapters.Email;
 using DatingApp.NotificationService.Infrastructure.Adapters.Logging;
 using DatingApp.NotificationService.Infrastructure.Adapters.Sms;
 using DatingApp.NotificationService.Infrastructure.Adapters.Templates;
+using DatingApp.NotificationService.Infrastructure.Consumers;
+using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +39,44 @@ builder.Services.AddSingleton<ITemplateProvider>(sp =>
 
 // Register application service
 builder.Services.AddScoped<NotificationService>();
+
+// ===========================================================================================
+// EVENT-DRIVEN ARCHITECTURE - MASSTRANSIT & RABBITMQ CONFIGURATION
+// ===========================================================================================
+// Configure MassTransit for consuming events from other services
+builder.Services.AddMassTransit(x =>
+{
+    // Register consumers (event handlers)
+    x.AddConsumer<UserRegisteredConsumer>();
+    x.AddConsumer<ProfileCompletedConsumer>();
+
+    // Configure RabbitMQ as message broker
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        // RabbitMQ connection (matches docker-compose.yml configuration)
+        cfg.Host("localhost", "/", h =>
+        {
+            h.Username("guest");
+            h.Password("guest");
+        });
+
+        // Configure receive endpoint for this service
+        cfg.ReceiveEndpoint("notification-service", e =>
+        {
+            // Retry configuration: 3 retries with exponential backoff
+            e.UseMessageRetry(r => r.Exponential(
+                retryLimit: 3,
+                minInterval: TimeSpan.FromSeconds(1),
+                maxInterval: TimeSpan.FromSeconds(30),
+                intervalDelta: TimeSpan.FromSeconds(2)
+            ));
+
+            // Configure consumers for this endpoint
+            e.ConfigureConsumer<UserRegisteredConsumer>(context);
+            e.ConfigureConsumer<ProfileCompletedConsumer>(context);
+        });
+    });
+});
 
 // Add Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
