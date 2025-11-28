@@ -1,7 +1,6 @@
 using DatingApp.NotificationService.Core.Domain.Enums;
 using DatingApp.NotificationService.Core.Domain.ValueObjects;
 using DatingApp.NotificationService.Core.Ports;
-using Microsoft.Extensions.Logging;
 
 namespace DatingApp.NotificationService.Core.Application.Services;
 
@@ -28,7 +27,7 @@ public class NotificationService
     private readonly IEmailProvider _emailProvider;
     private readonly ISmsProvider _smsProvider;
     private readonly ITemplateProvider _templateProvider;
-    private readonly ILogger<NotificationService> _logger;
+    private readonly INotificationLogger<NotificationService> _logger;
 
     /// <summary>
     /// Creates a new NotificationService.
@@ -36,12 +35,12 @@ public class NotificationService
     /// <param name="emailProvider">Email provider port (adapter injected via DI)</param>
     /// <param name="smsProvider">SMS provider port (adapter injected via DI)</param>
     /// <param name="templateProvider">Template provider port (adapter injected via DI)</param>
-    /// <param name="logger">Logger for diagnostics</param>
+    /// <param name="logger">Logger port (adapter injected via DI)</param>
     public NotificationService(
         IEmailProvider emailProvider,
         ISmsProvider smsProvider,
         ITemplateProvider templateProvider,
-        ILogger<NotificationService> logger)
+        INotificationLogger<NotificationService> logger)
     {
         _emailProvider = emailProvider ?? throw new ArgumentNullException(nameof(emailProvider));
         _smsProvider = smsProvider ?? throw new ArgumentNullException(nameof(smsProvider));

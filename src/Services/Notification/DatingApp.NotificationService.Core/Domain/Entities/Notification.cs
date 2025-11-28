@@ -29,12 +29,12 @@ public class Notification
     /// <summary>
     /// Notification subject/title
     /// </summary>
-    public string Subject { get; private set; }
+    public string Subject { get; private set; } = string.Empty;
 
     /// <summary>
     /// Notification body/content
     /// </summary>
-    public string Body { get; private set; }
+    public string Body { get; private set; } = string.Empty;
 
     /// <summary>
     /// Current delivery status

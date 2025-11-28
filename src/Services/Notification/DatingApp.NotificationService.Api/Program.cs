@@ -1,44 +1,151 @@
+using DatingApp.NotificationService.Core.Application.Services;
+using DatingApp.NotificationService.Core.Ports;
+using DatingApp.NotificationService.Infrastructure.Adapters.Email;
+using DatingApp.NotificationService.Infrastructure.Adapters.Logging;
+using DatingApp.NotificationService.Infrastructure.Adapters.Sms;
+using DatingApp.NotificationService.Infrastructure.Adapters.Templates;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// ===========================================================================================
+// HEXAGONAL ARCHITECTURE - DEPENDENCY INJECTION CONFIGURATION
+// ===========================================================================================
+// This is where we wire up PORTS (interfaces) to ADAPTERS (implementations).
+// The Core/Domain knows nothing about these concrete implementations!
+//
+// Benefits:
+// 1. Swap adapters without changing domain code (Console → SendGrid)
+// 2. Test with mock adapters
+// 3. Run different adapters in different environments (dev vs prod)
+// ===========================================================================================
+
+// Register logging adapter (wraps Microsoft.Extensions.Logging)
+builder.Services.AddSingleton(typeof(INotificationLogger<>), typeof(MicrosoftLoggerAdapter<>));
+
+// Register notification providers (ADAPTERS implementing PORTS)
+// IMPORTANT: These can be swapped! Change ConsoleEmailProvider → SendGridEmailProvider in production
+builder.Services.AddSingleton<IEmailProvider, ConsoleEmailProvider>();
+builder.Services.AddSingleton<ISmsProvider, ConsoleSmsProvider>();
+
+// Register template provider with template path
+var templatePath = Path.Combine(Directory.GetCurrentDirectory(), "..", "DatingApp.NotificationService.Infrastructure", "Templates");
+builder.Services.AddSingleton<ITemplateProvider>(sp =>
+{
+    var logger = sp.GetRequiredService<INotificationLogger<FileTemplateProvider>>();
+    return new FileTemplateProvider(templatePath, logger);
+});
+
+// Register application service
+builder.Services.AddScoped<NotificationService>();
+
+// Add Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() { Title = "QuietMatch Notification Service API", Version = "v1" });
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// ===========================================================================================
+// API ENDPOINTS - Demonstrating Hexagonal Architecture
+// ===========================================================================================
 
-var summaries = new[]
+app.MapGet("/", () => new
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+    service = "QuietMatch Notification Service",
+    version = "1.0.0",
+    architecture = "Hexagonal (Ports & Adapters)",
+    status = "Running",
+    endpoints = new[]
+    {
+        "GET  /health - Health check",
+        "POST /api/notifications/welcome - Send welcome email",
+        "POST /api/notifications/profile-completed - Send profile completed email",
+        "POST /api/notifications/sms - Send SMS"
+    }
 })
-.WithName("GetWeatherForecast")
+.WithName("ServiceInfo")
+.WithOpenApi();
+
+app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow })
+    .WithName("HealthCheck")
+    .WithOpenApi();
+
+// ===========================================================================================
+// DEMO: Send Welcome Email
+// ===========================================================================================
+// This endpoint demonstrates:
+// - How application service uses PORTS (not concrete adapters)
+// - How we can swap ConsoleEmailProvider → SendGridEmailProvider via DI
+// - Template rendering through ITemplateProvider port
+// ===========================================================================================
+app.MapPost("/api/notifications/welcome", async (
+    NotificationService notificationService,
+    WelcomeEmailRequest request) =>
+{
+    var result = await notificationService.SendWelcomeEmailAsync(
+        request.UserId,
+        request.Email,
+        request.Name);
+
+    return result
+        ? Results.Ok(new { success = true, message = "Welcome email sent successfully" })
+        : Results.StatusCode(500);
+})
+.WithName("SendWelcomeEmail")
+.WithOpenApi();
+
+// ===========================================================================================
+// DEMO: Send Profile Completed Email
+// ===========================================================================================
+app.MapPost("/api/notifications/profile-completed", async (
+    NotificationService notificationService,
+    ProfileCompletedRequest request) =>
+{
+    var result = await notificationService.SendProfileCompletedEmailAsync(
+        request.UserId,
+        request.Email,
+        request.Name);
+
+    return result
+        ? Results.Ok(new { success = true, message = "Profile completed email sent successfully" })
+        : Results.StatusCode(500);
+})
+.WithName("SendProfileCompletedEmail")
+.WithOpenApi();
+
+// ===========================================================================================
+// DEMO: Send SMS
+// ===========================================================================================
+app.MapPost("/api/notifications/sms", async (
+    NotificationService notificationService,
+    SmsRequest request) =>
+{
+    var result = await notificationService.SendSmsAsync(
+        request.PhoneNumber,
+        request.Message);
+
+    return result
+        ? Results.Ok(new { success = true, message = "SMS sent successfully" })
+        : Results.StatusCode(500);
+})
+.WithName("SendSms")
 .WithOpenApi();
 
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+// ===========================================================================================
+// REQUEST DTOs
+// ===========================================================================================
+
+record WelcomeEmailRequest(Guid UserId, string Email, string? Name);
+record ProfileCompletedRequest(Guid UserId, string Email, string Name);
+record SmsRequest(string PhoneNumber, string Message);
