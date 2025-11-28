@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.NotificationService.Core", "DatingApp.NotificationService.Core\DatingApp.NotificationService.Core.csproj", "{13FC378E-C51B-40CA-B761-A736EBE3F778}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.NotificationService.Infrastructure", "DatingApp.NotificationService.Infrastructure\DatingApp.NotificationService.Infrastructure.csproj", "{050AC03B-2C99-4B1D-8BA5-178C58372EF0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.NotificationService.Api", "DatingApp.NotificationService.Api\DatingApp.NotificationService.Api.csproj", "{A89D08A0-BC89-4D73-A6F6-A61E66C717D5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.NotificationService.Tests.Unit", "DatingApp.NotificationService.Tests.Unit\DatingApp.NotificationService.Tests.Unit.csproj", "{86A52E31-A857-4B9A-87D4-223B9AF08189}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DatingApp.NotificationService.Tests.Integration", "DatingApp.NotificationService.Tests.Integration\DatingApp.NotificationService.Tests.Integration.csproj", "{DA56FDF1-945A-4887-A142-4E317AA04B41}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{13FC378E-C51B-40CA-B761-A736EBE3F778}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{13FC378E-C51B-40CA-B761-A736EBE3F778}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{13FC378E-C51B-40CA-B761-A736EBE3F778}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{13FC378E-C51B-40CA-B761-A736EBE3F778}.Release|Any CPU.Build.0 = Release|Any CPU
+		{050AC03B-2C99-4B1D-8BA5-178C58372EF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{050AC03B-2C99-4B1D-8BA5-178C58372EF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{050AC03B-2C99-4B1D-8BA5-178C58372EF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{050AC03B-2C99-4B1D-8BA5-178C58372EF0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A89D08A0-BC89-4D73-A6F6-A61E66C717D5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A89D08A0-BC89-4D73-A6F6-A61E66C717D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A89D08A0-BC89-4D73-A6F6-A61E66C717D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A89D08A0-BC89-4D73-A6F6-A61E66C717D5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86A52E31-A857-4B9A-87D4-223B9AF08189}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86A52E31-A857-4B9A-87D4-223B9AF08189}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86A52E31-A857-4B9A-87D4-223B9AF08189}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86A52E31-A857-4B9A-87D4-223B9AF08189}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA56FDF1-945A-4887-A142-4E317AA04B41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA56FDF1-945A-4887-A142-4E317AA04B41}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA56FDF1-945A-4887-A142-4E317AA04B41}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA56FDF1-945A-4887-A142-4E317AA04B41}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
