@@ -133,6 +133,71 @@ curl -X POST http://localhost:5003/api/notifications/sms \
 
 You'll see beautifully formatted email and SMS messages in the console! This demonstrates the Console adapters in action.
 
+## 🐳 Running with Docker
+
+### Build the Docker image
+
+```bash
+# From the Notification service directory
+cd src/Services/Notification
+docker build -t quietmatch-notification:latest .
+```
+
+### Run standalone container
+
+```bash
+docker run -d \
+  --name notification-service \
+  -p 5003:8080 \
+  -e ASPNETCORE_ENVIRONMENT=Development \
+  -e RabbitMQ__Host=host.docker.internal \
+  quietmatch-notification:latest
+```
+
+### Run with docker-compose (Recommended)
+
+```bash
+# From the repository root
+cd /path/to/QuietMatch
+docker-compose up -d notification-service
+```
+
+This will:
+- Start RabbitMQ (dependency)
+- Build and start NotificationService
+- Expose service on `http://localhost:5003`
+
+**Check service health:**
+```bash
+curl http://localhost:5003/health
+```
+
+**View logs:**
+```bash
+docker-compose logs -f notification-service
+```
+
+**Stop services:**
+```bash
+docker-compose down
+```
+
+### Docker Configuration
+
+**Multi-stage build:**
+- **Build stage:** Uses `mcr.microsoft.com/dotnet/sdk:8.0` to compile the application
+- **Runtime stage:** Uses `mcr.microsoft.com/dotnet/aspnet:8.0` (smaller, production-ready)
+
+**Security features:**
+- Non-root user (appuser)
+- Minimal attack surface (aspnet runtime only)
+- Health check endpoint
+
+**Template handling:**
+- Email templates are copied from Infrastructure/Templates/ into the Docker image
+- Available at `/app/Templates` in the container
+- Configured via `Templates__BasePath` environment variable
+
 ## 📋 API Endpoints
 
 | Method | Endpoint | Description |
@@ -185,5 +250,6 @@ All without changing a single line in `NotificationService.cs`!
 ---
 
 **Architecture Pattern:** Hexagonal (Ports & Adapters)
-**Status:** ✅ MVP Complete (Phases 0-5)
-**Next Steps:** Event consumers (Phase 4), Tests (Phase 6), Docker (Phase 7)
+**Status:** ✅ All Phases Complete (Phases 0-7)
+**Implemented:** Domain, Application, Adapters, Events, DI, Demo, Unit Tests, Docker
+**Optional Next:** Production adapters (SendGrid, Twilio) - Phase 8
