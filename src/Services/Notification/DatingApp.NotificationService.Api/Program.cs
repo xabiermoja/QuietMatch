@@ -6,6 +6,8 @@ using DatingApp.NotificationService.Infrastructure.Adapters.Sms;
 using DatingApp.NotificationService.Infrastructure.Adapters.Templates;
 using DatingApp.NotificationService.Infrastructure.Consumers;
 using MassTransit;
+using SendGrid;
+using SendGrid.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,9 +26,53 @@ var builder = WebApplication.CreateBuilder(args);
 // Register logging adapter (wraps Microsoft.Extensions.Logging)
 builder.Services.AddSingleton(typeof(INotificationLogger<>), typeof(MicrosoftLoggerAdapter<>));
 
-// Register notification providers (ADAPTERS implementing PORTS)
-// IMPORTANT: These can be swapped! Change ConsoleEmailProvider → SendGridEmailProvider in production
-builder.Services.AddSingleton<IEmailProvider, ConsoleEmailProvider>();
+// ===========================================================================================
+// ADAPTER SWAPPING - The Power of Hexagonal Architecture!
+// ===========================================================================================
+// Read Email:Provider from configuration and register the appropriate adapter.
+// This demonstrates how we can swap adapters WITHOUT changing domain code!
+//
+// Supported providers:
+// - "Console" → ConsoleEmailProvider (development/testing)
+// - "SendGrid" → SendGridEmailProvider (production)
+// ===========================================================================================
+var emailProvider = builder.Configuration.GetValue<string>("Email:Provider") ?? "Console";
+
+if (emailProvider.Equals("SendGrid", StringComparison.OrdinalIgnoreCase))
+{
+    // Production: SendGrid adapter
+    var sendGridApiKey = builder.Configuration.GetValue<string>("Email:SendGrid:ApiKey");
+    var fromEmail = builder.Configuration.GetValue<string>("Email:SendGrid:FromEmail") ?? "noreply@quietmatch.com";
+    var fromName = builder.Configuration.GetValue<string>("Email:SendGrid:FromName") ?? "QuietMatch";
+
+    if (string.IsNullOrWhiteSpace(sendGridApiKey))
+    {
+        throw new InvalidOperationException(
+            "SendGrid API key is required when Email:Provider is set to 'SendGrid'. " +
+            "Set Email:SendGrid:ApiKey in appsettings.json or environment variable.");
+    }
+
+    // Register SendGrid client
+    builder.Services.AddSendGrid(options => options.ApiKey = sendGridApiKey);
+
+    // Register SendGrid adapter
+    builder.Services.AddSingleton<IEmailProvider>(sp =>
+    {
+        var client = sp.GetRequiredService<ISendGridClient>();
+        var logger = sp.GetRequiredService<INotificationLogger<SendGridEmailProvider>>();
+        return new SendGridEmailProvider(client, logger, fromEmail, fromName);
+    });
+
+    Console.WriteLine($"✅ Email Provider: SendGrid (from: {fromEmail})");
+}
+else
+{
+    // Development: Console adapter (default)
+    builder.Services.AddSingleton<IEmailProvider, ConsoleEmailProvider>();
+    Console.WriteLine("✅ Email Provider: Console (development mode)");
+}
+
+// Register SMS provider (Console for now, can add Twilio later)
 builder.Services.AddSingleton<ISmsProvider, ConsoleSmsProvider>();
 
 // Register template provider with template path
