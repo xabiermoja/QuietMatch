@@ -1,0 +1,6 @@
+@DatingApp.NotificationService.Api_HostAddress = http://localhost:5072
+
+GET {{DatingApp.NotificationService.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

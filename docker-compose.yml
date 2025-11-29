@@ -220,34 +220,27 @@ services:
   #   networks:
   #     - quietmatch-network
 
-  # notification-service:
-  #   build:
-  #     context: .
-  #     dockerfile: src/Services/Notification/Dockerfile
-  #   container_name: quietmatch-notification
-  #   restart: unless-stopped
-  #   ports:
-  #     - "5005:8080"
-  #   environment:
-  #     - ASPNETCORE_ENVIRONMENT=Development
-  #     - ASPNETCORE_URLS=http://+:8080
-  #     - ConnectionStrings__NotificationDb=Host=postgres;Port=5432;Database=notification_db;Username=admin;Password=QuietMatch_Dev_2025!
-  #     - MessageBroker__Host=rabbitmq
-  #     - MessageBroker__Port=5672
-  #     - MessageBroker__Username=guest
-  #     - MessageBroker__Password=guest
-  #     - Serilog__SeqUrl=http://seq:5341
-  #     - Email__Provider=SendGrid
-  #     - Email__SendGridApiKey=${SENDGRID_API_KEY}
-  #     - Email__FromAddress=noreply@quietmatch.com
-  #     - Email__FromName=QuietMatch
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     rabbitmq:
-  #       condition: service_healthy
-  #   networks:
-  #     - quietmatch-network
+  notification-service:
+    build:
+      context: ./src/Services/Notification
+      dockerfile: Dockerfile
+    container_name: quietmatch-notification
+    restart: unless-stopped
+    ports:
+      - "5003:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - Templates__BasePath=/app/Templates
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - quietmatch-network
 
   # graphql-gateway:
   #   build:
